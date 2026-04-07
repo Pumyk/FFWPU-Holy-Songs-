@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ffwpu-red: #B31B1B;
+  --color-ffwpu-gold: #D4AF37;
+  --color-ffwpu-blue: #003366;
+}
+
+@custom-variant dark (&:is(.dark *));
