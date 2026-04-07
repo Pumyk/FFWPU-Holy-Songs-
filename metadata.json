@@ -1,0 +1,5 @@
+{
+  "name": "HPHC-Holy Songs",
+  "description": "An offline mobile songbook app with light/dark mode and search functionality.",
+  "requestFramePermissions": []
+}
