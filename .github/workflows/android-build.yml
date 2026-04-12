@@ -39,32 +39,56 @@ jobs:
 
       - name: Repair Gradle Wrapper
         run: |
-          # Remove the potentially corrupted jar
           rm -f android/gradle/wrapper/gradle-wrapper.jar
+          mkdir -p android/gradle/wrapper
           
           MAX_ATTEMPTS=3
           ATTEMPT=1
           SUCCESS=false
           
+          # Array of mirror URLs to try
+          URLS=(
+            "https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar"
+            "https://gradle.org/releases/gradle-8.12.1/gradle-8.12.1-wrapper.jar"
+          )
+          
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Download attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            if curl -L --max-time 60 --connect-timeout 10 https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar; then
-              # Verify file integrity (it should be a Zip/Jar file)
-              if file android/gradle/wrapper/gradle-wrapper.jar | grep -q "Zip"; then
-                echo "Download successful and verified."
-                SUCCESS=true
-                break
+            for URL in "${URLS[@]}"; do
+              echo "Download attempt $ATTEMPT of $MAX_ATTEMPTS from: $URL"
+              
+              # Download with status code check
+              HTTP_CODE=$(curl -L --max-time 60 --connect-timeout 10 -w "%{http_code}" -o android/gradle/wrapper/gradle-wrapper.jar "$URL")
+              
+              if [ "$HTTP_CODE" -eq 200 ]; then
+                # Check file size (gradle-wrapper.jar should be > 50KB)
+                FILE_SIZE=$(stat -f%z android/gradle/wrapper/gradle-wrapper.jar 2>/dev/null || stat -c%s android/gradle/wrapper/gradle-wrapper.jar 2>/dev/null || echo 0)
+                
+                if [ "$FILE_SIZE" -gt 51200 ]; then
+                  # Verify it's actually a Zip/Jar file
+                  if file android/gradle/wrapper/gradle-wrapper.jar | grep -q "Zip"; then
+                    echo "✓ Download successful and verified (size: $FILE_SIZE bytes)"
+                    SUCCESS=true
+                    break 2
+                  fi
+                else
+                  echo "✗ File too small ($FILE_SIZE bytes), likely error response"
+                fi
+              else
+                echo "✗ HTTP error: $HTTP_CODE"
               fi
-            fi
+              
+              rm -f android/gradle/wrapper/gradle-wrapper.jar
+            done
             
-            echo "Download failed or invalid JAR, retrying in 5 seconds..."
-            rm -f android/gradle/wrapper/gradle-wrapper.jar
-            sleep 5
+            if [ "$SUCCESS" = false ]; then
+              echo "All mirrors failed, retrying in 5 seconds..."
+              sleep 5
+            fi
             ATTEMPT=$((ATTEMPT + 1))
           done
           
           if [ "$SUCCESS" = false ]; then
-            echo "Failed to download a valid gradle-wrapper.jar after $MAX_ATTEMPTS attempts"
+            echo "✗ Failed to download gradle-wrapper.jar after $MAX_ATTEMPTS attempts"
             exit 1
           fi
 
