@@ -1,0 +1,7 @@
+{
+  "name": "FFWPU-Holy-Songs",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react"
+}
