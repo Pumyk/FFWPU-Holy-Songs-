@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Setup Java
@@ -26,7 +26,7 @@ jobs:
           java-version: '17'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web App
         run: npm run build
@@ -36,8 +36,9 @@ jobs:
 
       - name: Build Android APK
         run: |
+          ls -la android/gradlew
           chmod +x android/gradlew
-          npm run mobile:build
+          cd android && ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
