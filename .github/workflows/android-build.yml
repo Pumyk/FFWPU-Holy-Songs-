@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'npm'
 
       - name: Setup Java
@@ -34,9 +37,13 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Repair Gradle Wrapper
+        run: |
+          # Download a fresh gradle-wrapper.jar if the current one is corrupt
+          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+
       - name: Build Android APK
         run: |
-          ls -la android/gradlew
           chmod +x android/gradlew
           cd android && ./gradlew assembleDebug
 
