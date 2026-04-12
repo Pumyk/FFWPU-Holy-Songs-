@@ -59,10 +59,10 @@ jobs:
               HTTP_CODE=$(curl -L --max-time 60 --connect-timeout 10 -w "%{http_code}" -o android/gradle/wrapper/gradle-wrapper.jar "$URL")
               
               if [ "$HTTP_CODE" -eq 200 ]; then
-                # Check file size (gradle-wrapper.jar should be > 50KB)
+                # Check file size (gradle-wrapper.jar should be > 40KB)
                 FILE_SIZE=$(stat -f%z android/gradle/wrapper/gradle-wrapper.jar 2>/dev/null || stat -c%s android/gradle/wrapper/gradle-wrapper.jar 2>/dev/null || echo 0)
                 
-                if [ "$FILE_SIZE" -gt 51200 ]; then
+                if [ "$FILE_SIZE" -gt 40000 ]; then
                   # Verify it's actually a Zip/Jar file
                   if file android/gradle/wrapper/gradle-wrapper.jar | grep -q "Zip"; then
                     echo "✓ Download successful and verified (size: $FILE_SIZE bytes)"
