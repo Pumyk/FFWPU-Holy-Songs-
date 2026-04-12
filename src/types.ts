@@ -3,4 +3,7 @@ export interface Song {
   title: string;
   number?: string;
   lyrics: string;
+  artist?: string;
+  album?: string;
+  category?: string;
 }

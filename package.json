@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "mobile:sync": "npm run build && npx cap sync",
+    "mobile:build": "npm run mobile:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/core": "^8.3.0",
