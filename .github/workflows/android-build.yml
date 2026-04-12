@@ -42,17 +42,31 @@ jobs:
           # Remove the potentially corrupted jar
           rm -f android/gradle/wrapper/gradle-wrapper.jar
           
-          # Download a fresh gradle-wrapper.jar from the official Gradle distribution
-          curl -L https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          SUCCESS=false
           
-          # Verify the download was successful
-          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "Failed to download gradle-wrapper.jar"
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Download attempt $ATTEMPT of $MAX_ATTEMPTS..."
+            if curl -L --max-time 60 --connect-timeout 10 https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar; then
+              # Verify file integrity (it should be a Zip/Jar file)
+              if file android/gradle/wrapper/gradle-wrapper.jar | grep -q "Zip"; then
+                echo "Download successful and verified."
+                SUCCESS=true
+                break
+              fi
+            fi
+            
+            echo "Download failed or invalid JAR, retrying in 5 seconds..."
+            rm -f android/gradle/wrapper/gradle-wrapper.jar
+            sleep 5
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          
+          if [ "$SUCCESS" = false ]; then
+            echo "Failed to download a valid gradle-wrapper.jar after $MAX_ATTEMPTS attempts"
             exit 1
           fi
-          
-          # Optional: verify file integrity
-          file android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Build Android APK
         run: |
