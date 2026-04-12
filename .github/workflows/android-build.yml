@@ -48,8 +48,7 @@ jobs:
           
           # Array of mirror URLs to try
           URLS=(
-            "https://services.gradle.org/distributions/gradle-8.13.1-wrapper.jar"
-            "https://gradle.org/releases/gradle-8.13.1/gradle-8.13.1-wrapper.jar"
+            "https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar"
           )
           
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
