@@ -39,8 +39,8 @@ jobs:
 
       - name: Repair Gradle Wrapper
         run: |
-          # Download a fresh gradle-wrapper.jar if the current one is corrupt
-          curl -L https://raw.githubusercontent.com/gradle/gradle/v8.12.1/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          # Download a fresh gradle-wrapper.jar from the official Gradle distribution
+          curl -L https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Build Android APK
         run: |
