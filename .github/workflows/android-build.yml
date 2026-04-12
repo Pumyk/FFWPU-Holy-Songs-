@@ -39,8 +39,20 @@ jobs:
 
       - name: Repair Gradle Wrapper
         run: |
+          # Remove the potentially corrupted jar
+          rm -f android/gradle/wrapper/gradle-wrapper.jar
+          
           # Download a fresh gradle-wrapper.jar from the official Gradle distribution
           curl -L https://services.gradle.org/distributions/gradle-8.12.1-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          
+          # Verify the download was successful
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Failed to download gradle-wrapper.jar"
+            exit 1
+          fi
+          
+          # Optional: verify file integrity
+          file android/gradle/wrapper/gradle-wrapper.jar
 
       - name: Build Android APK
         run: |
