@@ -233,7 +233,7 @@ export default function App() {
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-white dark:bg-[#001529] text-slate-900 dark:text-gray-100 font-sans transition-colors duration-200 selection:bg-ffwpu-blue/10 dark:selection:bg-ffwpu-gold/30">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#003366]/95 backdrop-blur-md border-b border-slate-100 dark:border-[#002A52] safe-top transition-all duration-300">
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#003366]/95 backdrop-blur-md border-b border-slate-100 dark:border-[#002A52] pt-[env(safe-area-inset-top)] transition-all duration-300">
           <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <AnimatePresence mode="popLayout">
@@ -296,7 +296,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
-              className="pb-32"
+              className="pb-[calc(8rem+env(safe-area-inset-bottom))]"
             >
               {/* Song Detail Header */}
               <div className="px-6 py-12 md:px-12 md:py-20 max-w-2xl mx-auto">
@@ -367,7 +367,7 @@ export default function App() {
               className="flex flex-col min-h-[calc(100vh-4rem)]"
             >
               {/* Search Bar */}
-              <div className="p-6 sticky top-16 z-20 bg-white/95 dark:bg-[#001529]/95 backdrop-blur-md">
+              <div className="p-6 sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 bg-white/95 dark:bg-[#001529]/95 backdrop-blur-md">
                 <div className="relative max-w-2xl mx-auto w-full">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-slate-400" />
@@ -391,7 +391,7 @@ export default function App() {
               </div>
 
               {/* Song List */}
-              <div className="flex-1 px-6 pb-32 max-w-2xl mx-auto w-full">
+              <div className="flex-1 px-6 pb-[calc(8rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full">
                 {filteredSongs.length > 0 ? (
                   <div className="space-y-1">
                     {filteredSongs.map((song) => (
@@ -439,7 +439,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-white dark:bg-[#001529] overflow-y-auto"
+              className="fixed inset-0 z-50 bg-white dark:bg-[#001529] overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
             >
               <div className="max-w-3xl mx-auto px-6 py-12">
                 <div className="flex items-center justify-between mb-12">
