@@ -256,10 +256,9 @@ export default function App() {
                     className="flex items-center justify-center w-8 h-8 -ml-1 bg-white rounded-lg shadow-sm border border-slate-100 dark:border-transparent"
                   >
                     <img 
-                      src="https://static.wikia.nocookie.net/logopedia/images/c/c4/Family_Federation_for_World_Peace_and_Unification.svg/revision/latest?cb=20230814040140" 
-                      alt="FFWPU Logo" 
-                      className="w-full h-full object-contain p-1"
-                      referrerPolicy="no-referrer"
+                      src="/icon.svg" 
+                      alt="Holy Song Book Logo" 
+                      className="w-full h-full object-contain p-0.5"
                     />
                   </motion.div>
                 )}

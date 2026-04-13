@@ -1,4 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#2563EB"/>
-  <path d="M256 160c0-35.3-28.7-64-64-64H96v320h96c35.3 0 64-28.7 64-64v-192zm0 0c0-35.3 28.7-64 64-64h96v320h-96c-35.3 0-64-28.7-64-64v-192z" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#003366" />
+      <stop offset="100%" stop-color="#001529" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE08B" />
+      <stop offset="100%" stop-color="#D4AF37" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  
+  <!-- Book -->
+  <path d="M256 144c0-35.3-28.7-64-64-64H112v320h80c35.3 0 64-28.7 64-64v-192zm0 0c0-35.3 28.7-64 64-64h80v320h-80c-35.3 0-64-28.7-64-64v-192z" stroke="url(#gold)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Music Note -->
+  <path d="M224 320a32 32 0 1 1-64 0 32 32 0 0 1 64 0z" fill="url(#gold)"/>
+  <path d="M352 288a32 32 0 1 1-64 0 32 32 0 0 1 64 0z" fill="url(#gold)"/>
+  <path d="M224 320V160l128-32v160" stroke="url(#gold)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
