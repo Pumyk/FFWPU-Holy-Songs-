@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Moon, Sun, ChevronLeft, Book, CloudUpload } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, Book } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { Song } from './types';
 import { db, auth } from './firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { uploadSongsToFirestore } from './uploadSongs';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
   // Pre-process lyrics to ensure Chorus markers are consistent and attached to their content
@@ -187,31 +186,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleAdminUpload = async () => {
-    if (!user) {
-      const provider = new GoogleAuthProvider();
-      try {
-        await signInWithPopup(auth, provider);
-      } catch (error) {
-        console.error("Login failed:", error);
-        return;
-      }
-    }
-    
-    // Only allow specific admin email
-    if (auth.currentUser?.email === "acad0040@gmail.com") {
-      try {
-        await uploadSongsToFirestore(songs);
-        alert("Songs uploaded to Firestore successfully!");
-      } catch (error) {
-        console.error("Upload failed:", error);
-        alert("Upload failed. Check console for details.");
-      }
-    } else {
-      alert("You do not have admin permissions to upload songs.");
-    }
-  };
-
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -221,21 +195,24 @@ export default function App() {
   }, [isDarkMode]);
 
   const filteredSongs = useMemo(() => {
-    if (!searchQuery.trim()) return songs;
-    const query = searchQuery.toLowerCase().trim();
+    let list = songs;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const isNumberQuery = /^\d+[a-z]?$/.test(query);
+      list = songs.filter(song => {
+        if (isNumberQuery && song.number) {
+          return song.number.toLowerCase() === query;
+        }
+        return song.title.toLowerCase().includes(query) || 
+               (song.number && song.number.toLowerCase().includes(query)) ||
+               song.lyrics.toLowerCase().includes(query);
+      });
+    }
     
-    // Check if query is a number (or number + letter like 21a)
-    const isNumberQuery = /^\d+[a-z]?$/.test(query);
-
-    return songs.filter(song => {
-      if (isNumberQuery && song.number) {
-        return song.number.toLowerCase() === query;
-      }
-      return song.title.toLowerCase().includes(query) || 
-             (song.number && song.number.toLowerCase().includes(query)) ||
-             song.lyrics.toLowerCase().includes(query);
-    }).sort((a, b) => {
-      // Sort by number if available
+    return [...list].sort((a, b) => {
+      // Songs without numbers go to the top
+      if (!a.number && b.number) return -1;
+      if (a.number && !b.number) return 1;
       if (a.number && b.number) {
         return a.number.localeCompare(b.number, undefined, { numeric: true, sensitivity: 'base' });
       }
@@ -279,6 +256,19 @@ export default function App() {
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(song);
     });
+    
+    // Sort songs within each category
+    Object.keys(groups).forEach(cat => {
+      groups[cat].sort((a, b) => {
+        if (!a.number && b.number) return -1;
+        if (a.number && !b.number) return 1;
+        if (a.number && b.number) {
+          return a.number.localeCompare(b.number, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        return 0;
+      });
+    });
+    
     return groups;
   }, [songs]);
 
@@ -345,15 +335,6 @@ export default function App() {
               >
                 <Book className="w-5 h-5" />
               </button>
-              {user?.email === "acad0040@gmail.com" && (
-                <button
-                  onClick={handleAdminUpload}
-                  className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/10 transition-colors text-slate-400 dark:text-white"
-                  aria-label="Upload to Firestore"
-                >
-                  <CloudUpload className="w-5 h-5" />
-                </button>
-              )}
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/10 transition-colors text-slate-400 dark:text-white"
