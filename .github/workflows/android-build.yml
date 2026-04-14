@@ -37,6 +37,9 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Generate Assets
+        run: npx -y @capacitor/assets generate --assetPath public
+
       - name: Repair Gradle Wrapper
         run: |
           rm -f android/gradle/wrapper/gradle-wrapper.jar

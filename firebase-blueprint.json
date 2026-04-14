@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "Song": {
+      "title": "Song",
+      "description": "A song in the songbook",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "number": { "type": "string" },
+        "lyrics": { "type": "string" },
+        "artist": { "type": "string" },
+        "album": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "title", "lyrics"]
+    }
+  },
+  "firestore": {
+    "/songs/{songId}": {
+      "schema": "Song",
+      "description": "Collection of holy songs"
+    }
+  }
+}
