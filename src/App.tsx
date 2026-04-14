@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Moon, Sun, ChevronLeft, Book } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, Book, CloudUpload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { Song } from './types';
+import { db, auth } from './firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { uploadSongsToFirestore } from './uploadSongs';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
 
 const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
   // Pre-process lyrics to ensure Chorus markers are consistent and attached to their content
@@ -126,9 +130,33 @@ export default function App() {
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [isTOCOpen, setIsTOCOpen] = useState(false);
+  const [tocSearchQuery, setTocSearchQuery] = useState('');
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const fetchSongs = async () => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    // First, try to fetch from Firestore for real-time updates
+    const q = query(collection(db, 'songs'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const firestoreSongs = snapshot.docs.map(doc => doc.data() as Song);
+        setSongs(firestoreSongs);
+      } else {
+        // Fallback to local HTML if Firestore is empty
+        fetchLocalSongs();
+      }
+    }, (error) => {
+      console.error("Firestore error, falling back to local:", error);
+      fetchLocalSongs();
+    });
+
+    const fetchLocalSongs = async () => {
       try {
         const response = await fetch('/songs.html');
         if (!response.ok) throw new Error('Failed to fetch songs');
@@ -152,12 +180,37 @@ export default function App() {
         
         setSongs(parsedSongs);
       } catch (error) {
-        console.error('Error fetching songs:', error);
+        console.error('Error fetching local songs:', error);
       }
     };
 
-    fetchSongs();
+    return () => unsubscribe();
   }, []);
+
+  const handleAdminUpload = async () => {
+    if (!user) {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.error("Login failed:", error);
+        return;
+      }
+    }
+    
+    // Only allow specific admin email
+    if (auth.currentUser?.email === "acad0040@gmail.com") {
+      try {
+        await uploadSongsToFirestore(songs);
+        alert("Songs uploaded to Firestore successfully!");
+      } catch (error) {
+        console.error("Upload failed:", error);
+        alert("Upload failed. Check console for details.");
+      }
+    } else {
+      alert("You do not have admin permissions to upload songs.");
+    }
+  };
 
   useEffect(() => {
     if (isDarkMode) {
@@ -229,6 +282,23 @@ export default function App() {
     return groups;
   }, [songs]);
 
+  const filteredSongsForTOC = useMemo(() => {
+    if (!tocSearchQuery.trim()) return songsByCategory;
+    const query = tocSearchQuery.toLowerCase().trim();
+    
+    const filteredGroups: Record<string, Song[]> = {};
+    Object.entries(songsByCategory).forEach(([category, categorySongs]) => {
+      const filtered = (categorySongs as Song[]).filter(song => 
+        song.title.toLowerCase().includes(query) || 
+        (song.number && song.number.toLowerCase().includes(query))
+      );
+      if (filtered.length > 0) {
+        filteredGroups[category] = filtered;
+      }
+    });
+    return filteredGroups;
+  }, [tocSearchQuery, songsByCategory]);
+
   return (
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-white dark:bg-[#001529] text-slate-900 dark:text-gray-100 font-sans transition-colors duration-200 selection:bg-ffwpu-blue/10 dark:selection:bg-ffwpu-gold/30">
@@ -275,6 +345,15 @@ export default function App() {
               >
                 <Book className="w-5 h-5" />
               </button>
+              {user?.email === "acad0040@gmail.com" && (
+                <button
+                  onClick={handleAdminUpload}
+                  className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/10 transition-colors text-slate-400 dark:text-white"
+                  aria-label="Upload to Firestore"
+                >
+                  <CloudUpload className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-white/10 transition-colors text-slate-400 dark:text-white"
@@ -446,15 +525,32 @@ export default function App() {
                     Table of Contents
                   </h2>
                   <button
-                    onClick={() => setIsTOCOpen(false)}
+                    onClick={() => {
+                      setIsTOCOpen(false);
+                      setTocSearchQuery('');
+                    }}
                     className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-500 hover:bg-slate-100 transition-all"
                   >
                     <ChevronLeft className="w-6 h-6 rotate-90 md:rotate-0" />
                   </button>
                 </div>
 
+                {/* TOC Search Bar */}
+                <div className="mb-12 relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={tocSearchQuery}
+                    onChange={(e) => setTocSearchQuery(e.target.value)}
+                    placeholder="Search in table of contents..."
+                    className="block w-full pl-11 pr-4 py-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl leading-5 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-ffwpu-blue/10 dark:focus:ring-ffwpu-gold/10 transition-all sm:text-sm"
+                  />
+                </div>
+
                 <div className="space-y-20">
-                  {Object.entries(songsByCategory).map(([category, categorySongs], catIndex) => (
+                  {Object.entries(filteredSongsForTOC).map(([category, categorySongs], catIndex) => (
                     <motion.div 
                       key={category} 
                       initial={{ opacity: 0, y: 30 }}
@@ -479,6 +575,7 @@ export default function App() {
                               setSelectedSong(song);
                               setIsTOCOpen(false);
                               setSearchQuery('');
+                              setTocSearchQuery('');
                             }}
                             className="flex items-baseline gap-5 py-3 group text-left transition-all border-b border-slate-50 dark:border-slate-900/50 hover:border-ffwpu-blue/20 dark:hover:border-ffwpu-gold/20"
                           >
