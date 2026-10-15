@@ -417,8 +417,8 @@ export default function App() {
                 {/* Hero */}
                 <div className="px-5 pt-10 pb-6 max-w-2xl mx-auto w-full relative">
                   <div className="absolute top-4 right-2 w-56 h-24 bg-amber-brand/15 dark:bg-amber-brand/10 blur-3xl rounded-full pointer-events-none" />
-                  <h2 className="relative text-[2rem] md:text-4xl font-black tracking-tight leading-tight text-ink-900 dark:text-creamtext">
-                    Sing with <span className="text-ember dark:text-amber-brand italic font-serif">spirit</span>
+                  <h2 className="relative text-[1.75rem] md:text-[2.25rem] font-black tracking-tight leading-[1.15] text-ink-900 dark:text-creamtext">
+                    Let's sing to glorify our <span className="text-ember dark:text-amber-brand italic font-serif">Heavenly Parent</span>
                   </h2>
                   <p className="relative mt-2 text-sm font-medium text-ink-500 dark:text-muted-warm">
                     {songs.length > 0 ? (
