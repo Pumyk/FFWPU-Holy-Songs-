@@ -17,8 +17,8 @@ export default defineConfig(({mode}) => {
           name: 'HPHC Holy Songs',
           short_name: 'Holy Songs',
           description: 'An offline mobile songbook app',
-          theme_color: '#ffffff',
-          background_color: '#ffffff',
+          theme_color: '#000000',
+          background_color: '#000000',
           display: 'standalone',
           icons: [
             {
