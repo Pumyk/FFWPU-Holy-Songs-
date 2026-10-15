@@ -14,16 +14,16 @@
   --color-cream-100: #F5EFE2;
   --color-cream-200: #EAE1CE;
   --color-ink-900: #1A1611;
-  --color-ink-700: #423B30;
-  --color-ink-500: #7A7263;
+  --color-ink-700: #574E40;
+  --color-ink-500: #6E6557;
 
   /* Dark: AMOLED black */
   --color-amoled: #000000;
   --color-night-900: #0B0A08;
   --color-night-800: #141210;
   --color-night-700: #201C17;
-  --color-creamtext: #F2EAD8;
-  --color-muted-warm: #A79C86;
+  --color-creamtext: #F5EEDC;
+  --color-muted-warm: #B8AC94;
 
   --font-serif: "Iowan Old Style", "Palatino Linotype", "Georgia", serif;
 }
@@ -38,6 +38,22 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth cross-fade while switching dark/light mode.
+   Applied to <html> for ~400ms during the toggle so every
+   surface, border and text color eases together instead of snapping. */
+.theme-anim,
+.theme-anim *,
+.theme-anim *::before,
+.theme-anim *::after {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    fill 0.3s ease,
+    stroke 0.3s ease,
+    box-shadow 0.3s ease !important;
 }
 
 /* Refined scrollbars */
