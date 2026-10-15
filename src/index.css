@@ -1,9 +1,62 @@
 @import "tailwindcss";
 
 @theme {
+  /* Brand */
   --color-ffwpu-red: #B31B1B;
   --color-ffwpu-gold: #D4AF37;
-  --color-ffwpu-blue: #003366;
+
+  /* Warm accent ramp (mustard -> orange) */
+  --color-amber-brand: #F5B301;
+  --color-ember: #E8590C;
+
+  /* Light: warm cream paper */
+  --color-cream-50: #FBF7EF;
+  --color-cream-100: #F5EFE2;
+  --color-cream-200: #EAE1CE;
+  --color-ink-900: #1A1611;
+  --color-ink-700: #423B30;
+  --color-ink-500: #7A7263;
+
+  /* Dark: AMOLED black */
+  --color-amoled: #000000;
+  --color-night-900: #0B0A08;
+  --color-night-800: #141210;
+  --color-night-700: #201C17;
+  --color-creamtext: #F2EAD8;
+  --color-muted-warm: #A79C86;
+
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Georgia", serif;
 }
 
 @custom-variant dark (&:is(.dark *));
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Refined scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(245 179 1 / 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(245 179 1 / 0.45);
+}
+
+/* Subtle glow used on hero accents */
+.glow-amber {
+  box-shadow: 0 0 60px 12px rgb(245 179 1 / 0.16);
+}
