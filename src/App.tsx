@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type TouchEvent as ReactTouchEvent } from 'react';
-import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, Palette, HeartHandshake } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, HeartHandshake } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song } from './types';
 import songsHtml from './songs.html?raw';
@@ -45,8 +45,6 @@ interface MaterialYouColors {
 
 const materialYouFetch = async (): Promise<MaterialYouColors | null> => {
   try {
-    const cached = window.localStorage.getItem('holy-songs-my-colors');
-    if (cached) return JSON.parse(cached) as MaterialYouColors;
     const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('MaterialYou')) return null;
     const plugins = (Capacitor as unknown as { Plugins: Record<string, { getColors: () => Promise<{ available: boolean; accent1?: string; accent1Deep?: string }> }> }).Plugins;
@@ -54,9 +52,7 @@ const materialYouFetch = async (): Promise<MaterialYouColors | null> => {
     if (!plugin) return null;
     const res = await plugin.getColors();
     if (!res?.available || !res.accent1 || !res.accent1Deep) return null;
-    const colors = { accent1: res.accent1, accent1Deep: res.accent1Deep };
-    window.localStorage.setItem('holy-songs-my-colors', JSON.stringify(colors));
-    return colors;
+    return { accent1: res.accent1, accent1Deep: res.accent1Deep };
   } catch {
     return null;
   }
@@ -170,7 +166,7 @@ const renderSplash = () => {
       key="splash"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-cream-50 dark:bg-amoled overflow-hidden"
       exit={{ opacity: 0, scale: 1.03 }}
-      transition={{ duration: 0.28, ease: [0.4, 0, 1, 1] }}
+      transition={{ duration: 0.22, ease: [0.4, 0, 1, 1] }}
     >
       {/* Ambient accent glow */}
       <motion.div
@@ -178,14 +174,14 @@ const renderSplash = () => {
         style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 22%, transparent), transparent)' }}
         initial={{ opacity: 0, scale: 0.5 }}
         animate={{ opacity: [0, 0.9, 0.55], scale: [0.5, 1.2, 1] }}
-        transition={{ duration: 1.9, times: [0, 0.35, 1] }}
+        transition={{ duration: 1.2, times: [0, 0.35, 1] }}
       />
 
       {/* Logo tile */}
       <motion.div
         initial={{ scale: 0.3, rotate: -16, opacity: 0 }}
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
-        transition={{ ...SPRING_BOUNCY, delay: 0.15 }}
+        transition={{ ...SPRING_BOUNCY, delay: 0.08 }}
         className="relative flex items-center justify-center w-24 h-24 rounded-[28px] bg-black dark:bg-night-800 border border-white/10 shadow-2xl shadow-black/30 overflow-hidden"
       >
         <img src="/icon.svg" alt="Holy Songs" className="w-full h-full p-4" />
@@ -195,7 +191,7 @@ const renderSplash = () => {
       <motion.h1
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ ...FAST, delay: 0.45 }}
+        transition={{ ...FAST, delay: 0.25 }}
         className="relative mt-7 text-3xl font-black tracking-tight text-ink-900 dark:text-creamtext"
       >
         Holy Songs
@@ -205,7 +201,7 @@ const renderSplash = () => {
       <motion.p
         initial={{ y: 12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ ...FAST, delay: 0.6 }}
+        transition={{ ...FAST, delay: 0.38 }}
         className="relative mt-2 px-6 text-center text-sm font-bold text-ink-700 dark:text-muted-warm"
       >
         Let's sing to glorify our{' '}
@@ -216,14 +212,14 @@ const renderSplash = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.75 }}
+        transition={{ delay: 0.45 }}
         className="relative mt-10 w-40 h-1 rounded-full bg-amber-brand/15 overflow-hidden"
       >
         <motion.div
           className="h-full rounded-full bg-amber-brand"
           initial={{ width: '0%' }}
           animate={{ width: '100%' }}
-          transition={{ duration: 1.0, delay: 0.8, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 0.65, delay: 0.5, ease: [0.4, 0, 0.2, 1] }}
         />
       </motion.div>
     </motion.div>
@@ -251,9 +247,6 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [showSplash, setShowSplash] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
-  const [dynamicColor, setDynamicColor] = useState(() =>
-    window.localStorage.getItem('holy-songs-dynamic') === 'on'
-  );
 
   const themeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -262,7 +255,7 @@ export default function App() {
 
   useEffect(() => {
     if (!showSplash) return;
-    const t = setTimeout(() => setShowSplash(false), 1900);
+    const t = setTimeout(() => setShowSplash(false), 1200);
     return () => clearTimeout(t);
   }, [showSplash]);
 
@@ -325,22 +318,17 @@ export default function App() {
     setIsDarkMode(v => !v);
   };
 
-  /* ---------------------------- Material You toggle ---------------------------- */
+  /* ---------------------------- Material You ---------------------------- */
 
+  /* Material You is the app's single style: adopt the wallpaper-derived accent
+     on Android 12+; the mustard palette remains the fallback elsewhere. */
   useEffect(() => {
-    window.localStorage.setItem('holy-songs-dynamic', dynamicColor ? 'on' : 'off');
-    if (!dynamicColor) {
-      applyDynamicColors(null);
-      return;
-    }
     let cancelled = false;
     materialYouFetch().then(colors => {
-      if (cancelled) return;
-      if (colors) applyDynamicColors(colors);
-      else showToast('Material You needs Android 12+');
+      if (!cancelled && colors) applyDynamicColors(colors);
     });
     return () => { cancelled = true; };
-  }, [dynamicColor]);
+  }, []);
 
   /* ----------------------------- Back navigation ----------------------------- */
   /* The app is driven by history entries: every page (list -> song -> song via
@@ -579,23 +567,6 @@ export default function App() {
             <motion.button
               whileTap={{ scale: 0.88 }}
               transition={TAP}
-              onClick={() => setDynamicColor(v => !v)}
-              className={`relative p-2.5 rounded-full border transition-all ${
-                dynamicColor
-                  ? 'bg-amber-brand/15 border-amber-brand/40 text-ember dark:text-amber-brand'
-                  : 'bg-cream-100 dark:bg-night-800 border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext'
-              }`}
-              aria-label="Toggle Material You dynamic color"
-              title="Material You dynamic color"
-            >
-              <Palette className="w-[18px] h-[18px]" />
-              {dynamicColor && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-ember dark:bg-amber-brand" />
-              )}
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.88 }}
-              transition={TAP}
               onClick={goTOC}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Table of Contents"
@@ -748,7 +719,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.1 }}
               className="flex flex-col min-h-[calc(100vh-4rem)]"
             >
               {/* Hero */}
@@ -849,7 +820,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.1 }}
               className="fixed inset-0 z-50 bg-cream-50 dark:bg-amoled overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
             >
               <div className="max-w-3xl mx-auto px-5 py-12">
