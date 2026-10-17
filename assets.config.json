@@ -1,0 +1,12 @@
+{
+  "appId": "com.hphc.holysongs",
+  "appName": "HPHC Holy Songs",
+  "android": {
+    "splash": {
+      "backgroundColor": "#FBF7EF",
+      "dark": {
+        "backgroundColor": "#000000"
+      }
+    }
+  }
+}

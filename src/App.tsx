@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type TouchEvent as ReactTouchEvent } from 'react';
-import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, Palette, HeartHandshake } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song } from './types';
 import songsHtml from './songs.html?raw';
@@ -27,18 +27,59 @@ const LOCAL_SONGS = parseSongs(songsHtml);
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 2.5;
 
+/* ------------------------ Material Motion: expressive springs ------------------------ */
+
+/** Fast spatial spring — M3 expressive default for surface transitions */
+const SPRING = { type: 'spring', stiffness: 380, damping: 30 } as const;
+/** Softer, bouncier spring — hero moments, splash */
+const SPRING_BOUNCY = { type: 'spring', stiffness: 210, damping: 17, mass: 0.9 } as const;
+
+/* ---------------------------- Material You (dynamic color) ---------------------------- */
+
+interface MaterialYouColors {
+  accent1: string;
+  accent1Deep: string;
+}
+
+const materialYouFetch = async (): Promise<MaterialYouColors | null> => {
+  try {
+    const cached = window.localStorage.getItem('holy-songs-my-colors');
+    if (cached) return JSON.parse(cached) as MaterialYouColors;
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable('MaterialYou')) return null;
+    const plugins = (Capacitor as unknown as { Plugins: Record<string, { getColors: () => Promise<{ available: boolean; accent1?: string; accent1Deep?: string }> }> }).Plugins;
+    const plugin = plugins.MaterialYou;
+    if (!plugin) return null;
+    const res = await plugin.getColors();
+    if (!res?.available || !res.accent1 || !res.accent1Deep) return null;
+    const colors = { accent1: res.accent1, accent1Deep: res.accent1Deep };
+    window.localStorage.setItem('holy-songs-my-colors', JSON.stringify(colors));
+    return colors;
+  } catch {
+    return null;
+  }
+};
+
+const applyDynamicColors = (colors: MaterialYouColors | null) => {
+  const root = document.documentElement;
+  if (colors) {
+    root.style.setProperty('--color-amber-brand', colors.accent1);
+    root.style.setProperty('--color-ember', colors.accent1Deep);
+  } else {
+    root.style.removeProperty('--color-amber-brand');
+    root.style.removeProperty('--color-ember');
+  }
+};
+
 /* -------------------------------- Lyrics view -------------------------------- */
 
 const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
-  // Pre-process lyrics to ensure Chorus markers are consistent and attached to their content
   const processedLyrics = lyrics
     .replace(/Chorus:\s*/gi, '[CHORUS]\n')
     .replace(/Verse (\d+):\s*/gi, '[VERSE $1]\n');
 
-  // Split into paragraphs by double newlines
   const paragraphs = processedLyrics.split(/\n\s*\n/).filter(p => p.trim() !== '');
 
-  // Extract the first chorus text found to repeat it
   const chorusParagraph = paragraphs.find(p => p.includes('[CHORUS]'));
   const chorusText = chorusParagraph ? chorusParagraph.replace('[CHORUS]', '').trim() : null;
 
@@ -51,9 +92,7 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
 
     if (isChorus) {
       const text = paragraph.replace('[CHORUS]', '').trim();
-      if (text) {
-        items.push({ type: 'chorus', text });
-      }
+      if (text) items.push({ type: 'chorus', text });
     } else {
       let verseNumber: string;
       let verseText: string;
@@ -67,32 +106,32 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
         verseText = paragraph.trim();
       }
 
-      if (verseText) {
-        items.push({ type: 'verse', text: verseText, number: verseNumber });
-      }
+      if (verseText) items.push({ type: 'verse', text: verseText, number: verseNumber });
     }
   });
 
   return (
     <div className="font-serif font-medium leading-[1.75] text-[1em] text-ink-900 dark:text-creamtext space-y-12 pb-12">
       {items.map((item, index) => {
-        // If it's a chorus item, we skip it in the main loop because we'll
-        // inject it after each verse if it exists.
         if (item.type === 'chorus') return null;
 
         return (
           <div key={index} className="space-y-12">
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
+              transition={{ ...SPRING, delay: 0.04 }}
               className="relative group pl-12 md:pl-16"
             >
               {/* Floating verse number bubble */}
-              <div className="absolute left-0 top-0 flex items-center justify-center w-9 h-9 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-xs font-black font-mono text-ember dark:text-amber-brand group-hover:scale-110 group-hover:bg-amber-brand group-hover:text-black transition-all duration-300 shadow-sm">
+              <motion.div
+                whileTap={{ scale: 0.88 }}
+                transition={SPRING}
+                className="absolute left-0 top-0 flex items-center justify-center w-9 h-9 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-xs font-black font-mono text-ember dark:text-amber-brand group-hover:scale-110 group-hover:bg-amber-brand group-hover:text-black transition-all duration-300 shadow-sm"
+              >
                 {item.number}
-              </div>
+              </motion.div>
 
               <div className="whitespace-pre-wrap tracking-[0.01em]">
                 {item.text}
@@ -102,13 +141,12 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
             {/* Auto-inject Chorus after each verse */}
             {chorusText && (
               <motion.div
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 14 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
+                transition={SPRING}
                 className="relative rounded-[28px] bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 p-6 md:p-8 overflow-hidden"
               >
-                {/* Soft amber glow in the corner */}
                 <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-amber-brand/10 dark:bg-amber-brand/[0.07] blur-2xl pointer-events-none" />
 
                 <div className="relative">
@@ -132,7 +170,76 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
   );
 };
 
+/* --------------------------------- Splash --------------------------------- */
+
+const renderSplash = () => {
+  return (
+    <motion.div
+      key="splash"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-cream-50 dark:bg-amoled overflow-hidden"
+      exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
+      transition={{ duration: 0.5, ease: [0.32, 0, 0.67, 0] }}
+    >
+      {/* Ambient accent glow */}
+      <motion.div
+        className="absolute w-[22rem] h-[22rem] rounded-full bg-amber-brand/20 blur-3xl pointer-events-none"
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: [0, 0.9, 0.55], scale: [0.5, 1.2, 1] }}
+        transition={{ duration: 1.9, times: [0, 0.35, 1] }}
+      />
+
+      {/* Logo tile */}
+      <motion.div
+        initial={{ scale: 0.3, rotate: -16, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ ...SPRING_BOUNCY, delay: 0.15 }}
+        className="relative flex items-center justify-center w-24 h-24 rounded-[28px] bg-black dark:bg-night-800 border border-white/10 shadow-2xl shadow-black/30 overflow-hidden"
+      >
+        <img src="/icon.svg" alt="Holy Songs" className="w-full h-full p-4" />
+      </motion.div>
+
+      {/* Title */}
+      <motion.h1
+        initial={{ y: 18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ ...SPRING, delay: 0.45 }}
+        className="relative mt-7 text-3xl font-black tracking-tight text-ink-900 dark:text-creamtext"
+      >
+        Holy Songs
+      </motion.h1>
+
+      {/* Subtitle */}
+      <motion.p
+        initial={{ y: 12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ ...SPRING, delay: 0.6 }}
+        className="relative mt-2 px-6 text-center text-sm font-bold text-ink-700 dark:text-muted-warm"
+      >
+        Let's sing to glorify our{' '}
+        <span className="text-ember dark:text-amber-brand italic font-serif">Heavenly Parent</span>
+      </motion.p>
+
+      {/* Loading bar */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.75 }}
+        className="relative mt-10 w-40 h-1 rounded-full bg-amber-brand/15 overflow-hidden"
+      >
+        <motion.div
+          className="h-full rounded-full bg-amber-brand"
+          initial={{ width: '0%' }}
+          animate={{ width: '100%' }}
+          transition={{ duration: 1.0, delay: 0.8, ease: [0.4, 0, 0.2, 1] }}
+        />
+      </motion.div>
+    </motion.div>
+  );
+};
+
 /* ---------------------------------- App ---------------------------------- */
+
+type NavState = { hs: 'song'; id: string } | { hs: 'toc' } | null;
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -149,10 +256,31 @@ export default function App() {
   const [isTOCOpen, setIsTOCOpen] = useState(false);
   const [tocSearchQuery, setTocSearchQuery] = useState('');
   const [zoom, setZoom] = useState(1);
+  const [showSplash, setShowSplash] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
+  const [dynamicColor, setDynamicColor] = useState(() =>
+    window.localStorage.getItem('holy-songs-dynamic') === 'on'
+  );
 
   const themeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const songsRef = useRef(songs);
+  songsRef.current = songs;
 
-  // Sync Firestore in the background (lazy) — the UI is already usable from the bundled songbook
+  useEffect(() => {
+    if (!showSplash) return;
+    const t = setTimeout(() => setShowSplash(false), 1900);
+    return () => clearTimeout(t);
+  }, [showSplash]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  };
+
+  /* -------- Firestore sync (lazy) — UI already usable from bundled songbook -------- */
+
   useEffect(() => {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
@@ -187,6 +315,8 @@ export default function App() {
     };
   }, []);
 
+  /* --------------------------------- Theme --------------------------------- */
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
     window.localStorage.setItem('holy-songs-theme', isDarkMode ? 'dark' : 'light');
@@ -201,6 +331,94 @@ export default function App() {
     themeTimer.current = setTimeout(() => el.classList.remove('theme-anim'), 400);
     setIsDarkMode(v => !v);
   };
+
+  /* ---------------------------- Material You toggle ---------------------------- */
+
+  useEffect(() => {
+    window.localStorage.setItem('holy-songs-dynamic', dynamicColor ? 'on' : 'off');
+    if (!dynamicColor) {
+      applyDynamicColors(null);
+      return;
+    }
+    let cancelled = false;
+    materialYouFetch().then(colors => {
+      if (cancelled) return;
+      if (colors) applyDynamicColors(colors);
+      else showToast('Material You needs Android 12+');
+    });
+    return () => { cancelled = true; };
+  }, [dynamicColor]);
+
+  /* ----------------------------- Back navigation ----------------------------- */
+  /* The app is driven by history entries: every page (list -> song -> song via
+     Next, TOC overlay) pushes an entry, so hardware/browser back always walks
+     to the previous page instead of closing the app. Root-level back shows a
+     "press again to exit" toast on Android. */
+
+  const applyNav = (st: NavState) => {
+    if (st?.hs === 'song') {
+      const s = songsRef.current.find(x => x.id === st.id) || null;
+      setSelectedSong(s);
+      setIsTOCOpen(false);
+      window.scrollTo(0, 0);
+    } else if (st?.hs === 'toc') {
+      setIsTOCOpen(true);
+    } else {
+      setSelectedSong(null);
+      setIsTOCOpen(false);
+      setTocSearchQuery('');
+    }
+  };
+
+  const pushNav = (st: NavState) => {
+    if (!st) return;
+    window.history.pushState(st, '');
+    applyNav(st);
+  };
+
+  const goSong = (song: Song) => pushNav({ hs: 'song', id: song.id });
+  const goTOC = () => pushNav({ hs: 'toc' });
+  const goBack = () => window.history.back();
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => applyNav((e.state as NavState) ?? null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  useEffect(() => {
+    let handle: { remove: () => void } | undefined;
+    let lastBack = 0;
+    let cancelled = false;
+
+    const setup = async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (cancelled || !Capacitor.isNativePlatform()) return;
+      const { App: CapApp } = await import('@capacitor/app');
+      const h = await CapApp.addListener('backButton', () => {
+        if (window.history.state && (window.history.state as NavState)?.hs) {
+          window.history.back();
+          return;
+        }
+        const now = Date.now();
+        if (now - lastBack < 2200) {
+          CapApp.exitApp();
+        } else {
+          lastBack = now;
+          showToast('Press back again to exit');
+        }
+      });
+      handle = h;
+    };
+    setup();
+
+    return () => {
+      cancelled = true;
+      handle?.remove();
+    };
+  }, []);
+
+  /* ---------------------------------- Data ---------------------------------- */
 
   const filteredSongs = useMemo(() => {
     let list = songs;
@@ -239,15 +457,13 @@ export default function App() {
 
   const handleNext = () => {
     if (currentSongIndex < navigationList.length - 1) {
-      setSelectedSong(navigationList[currentSongIndex + 1]);
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      goSong(navigationList[currentSongIndex + 1]);
     }
   };
 
   const handlePrevious = () => {
     if (currentSongIndex > 0) {
-      setSelectedSong(navigationList[currentSongIndex - 1]);
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      goSong(navigationList[currentSongIndex - 1]);
     }
   };
 
@@ -301,20 +517,45 @@ export default function App() {
   const changeZoom = (delta: number) =>
     setZoom(z => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
+  /* --------------------------------- Render --------------------------------- */
+
   return (
     <div className="min-h-screen bg-cream-50 dark:bg-amoled text-ink-900 dark:text-creamtext font-sans selection:bg-amber-brand/20 dark:selection:bg-amber-brand/30">
+      {/* Animated splash overlay */}
+      <AnimatePresence>
+        {showSplash && renderSplash()}
+      </AnimatePresence>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            transition={SPRING}
+            className="fixed bottom-[calc(2.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 text-cream-100 text-sm font-bold shadow-2xl whitespace-nowrap"
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="sticky top-0 z-30 bg-cream-50/85 dark:bg-amoled/85 backdrop-blur-xl border-b border-cream-200/60 dark:border-white/5 pt-[env(safe-area-inset-top)]">
         <div className="max-w-3xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="popLayout" initial={false}>
               {selectedSong ? (
                 <motion.button
+                  key="back"
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -6 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={() => setSelectedSong(null)}
+                  transition={SPRING}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={goBack}
                   className="p-2.5 -ml-2 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
                   aria-label="Go back"
                 >
@@ -322,10 +563,11 @@ export default function App() {
                 </motion.button>
               ) : (
                 <motion.div
+                  key="logo"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.15 }}
+                  transition={SPRING}
                   className="flex items-center justify-center w-10 h-10 rounded-2xl bg-black dark:bg-night-800 border border-white/5 shadow-lg overflow-hidden"
                 >
                   <img
@@ -341,33 +583,54 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsTOCOpen(true)}
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              transition={SPRING}
+              onClick={() => setDynamicColor(v => !v)}
+              className={`relative p-2.5 rounded-full border transition-all ${
+                dynamicColor
+                  ? 'bg-amber-brand/15 border-amber-brand/40 text-ember dark:text-amber-brand'
+                  : 'bg-cream-100 dark:bg-night-800 border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext'
+              }`}
+              aria-label="Toggle Material You dynamic color"
+              title="Material You dynamic color"
+            >
+              <Palette className="w-[18px] h-[18px]" />
+              {dynamicColor && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-ember dark:bg-amber-brand" />
+              )}
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              transition={SPRING}
+              onClick={goTOC}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Table of Contents"
             >
               <Book className="w-[18px] h-[18px]" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              transition={SPRING}
               onClick={toggleTheme}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Toggle theme"
             >
               {isDarkMode ? <Sun className="w-[18px] h-[18px] text-amber-brand" /> : <Moon className="w-[18px] h-[18px]" />}
-            </button>
+            </motion.button>
           </div>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto relative">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           {selectedSong ? (
             <motion.div
-              key="detail"
-              initial={{ opacity: 0, y: 10 }}
+              key={`song-${selectedSong.id}`}
+              initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={SPRING}
               className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
             >
               {/* Song Detail Header */}
@@ -412,33 +675,39 @@ export default function App() {
                 {/* Zoom toolbar */}
                 <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 flex justify-end -mt-2 mb-5">
                   <div className="flex items-center gap-0.5 rounded-full bg-ink-900/95 dark:bg-night-800/95 backdrop-blur-xl border border-white/10 shadow-xl px-1 py-1">
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      transition={SPRING}
                       onClick={() => changeZoom(-0.15)}
                       disabled={zoom <= MIN_ZOOM}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
                       aria-label="Zoom out"
                     >
                       <ZoomOut className="w-4 h-4" />
-                    </button>
+                    </motion.button>
                     <span className="text-[11px] font-black font-mono text-amber-brand w-11 text-center tabular-nums">
                       {Math.round(zoom * 100)}%
                     </span>
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      transition={SPRING}
                       onClick={() => changeZoom(0.15)}
                       disabled={zoom >= MAX_ZOOM}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
                       aria-label="Zoom in"
                     >
                       <ZoomIn className="w-4 h-4" />
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      transition={SPRING}
                       onClick={() => setZoom(1)}
                       disabled={zoom === 1}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
                       aria-label="Reset zoom"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
 
@@ -455,23 +724,27 @@ export default function App() {
                 {/* Floating Navigation */}
                 <div className="sticky bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 mt-16">
                   <div className="flex items-center gap-3 p-2 rounded-[28px] bg-ink-900/95 dark:bg-night-800/95 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/40">
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      transition={SPRING}
                       onClick={handlePrevious}
                       disabled={currentSongIndex <= 0}
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[22px] text-cream-100 font-bold text-sm hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       Previous
-                    </button>
+                    </motion.button>
                     <div className="w-px h-8 bg-white/10" />
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      transition={SPRING}
                       onClick={handleNext}
                       disabled={currentSongIndex >= navigationList.length - 1}
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[22px] bg-amber-brand text-black font-bold text-sm hover:bg-amber-brand/90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
                     >
                       Next
                       <ChevronRight className="w-4 h-4" />
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </div>
@@ -494,6 +767,7 @@ export default function App() {
                 <p className="relative mt-2 text-sm font-bold text-ink-700 dark:text-muted-warm">
                   {songs.length > 0 ? (
                     <>
+                      <HeartHandshake className="inline w-4 h-4 mr-1.5 -mt-0.5 text-ember dark:text-amber-brand" />
                       <span className="font-black text-ember dark:text-amber-brand">{songs.length}</span> songs ready
                     </>
                   ) : (
@@ -536,9 +810,10 @@ export default function App() {
                         key={song.id}
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.25 }}
-                        onClick={() => setSelectedSong(song)}
-                        className="w-full text-left p-4 rounded-[24px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 dark:hover:border-amber-brand/30 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 active:scale-[0.99] transition-all group flex items-center gap-4"
+                        transition={SPRING}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => goSong(song)}
+                        className="w-full text-left p-4 rounded-[24px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 dark:hover:border-amber-brand/30 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all group flex items-center gap-4"
                       >
                         {song.number && (
                           <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-cream-100 dark:bg-black flex items-center justify-center text-ink-700 dark:text-amber-brand font-mono font-black text-xs group-hover:bg-amber-brand group-hover:text-black transition-all">
@@ -577,6 +852,7 @@ export default function App() {
         <AnimatePresence>
           {isTOCOpen && (
             <motion.div
+              key="toc"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -593,16 +869,15 @@ export default function App() {
                       Browse by category
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsTOCOpen(false);
-                      setTocSearchQuery('');
-                    }}
+                  <motion.button
+                    whileTap={{ scale: 0.88 }}
+                    transition={SPRING}
+                    onClick={goBack}
                     className="p-3 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-ink-700 dark:text-creamtext hover:bg-cream-200 dark:hover:bg-night-700 transition-all"
                     aria-label="Close contents"
                   >
                     <X className="w-5 h-5" />
-                  </button>
+                  </motion.button>
                 </div>
 
                 {/* TOC Search Bar */}
@@ -631,14 +906,11 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-1">
                         {(categorySongs as Song[]).sort((a, b) => (a.number || '').localeCompare(b.number || '', undefined, { numeric: true })).map((song) => (
-                          <button
+                          <motion.button
                             key={song.id}
-                            onClick={() => {
-                              setSelectedSong(song);
-                              setIsTOCOpen(false);
-                              setSearchQuery('');
-                              setTocSearchQuery('');
-                            }}
+                            whileTap={{ scale: 0.985 }}
+                            transition={SPRING}
+                            onClick={() => goSong(song)}
                             className="flex items-baseline gap-4 py-3 group text-left border-b border-transparent hover:border-amber-brand/30 rounded-lg px-2 -mx-2 hover:bg-amber-brand/[0.06] transition-all"
                           >
                             <span className="text-xs font-mono font-black text-ember/70 dark:text-amber-brand/60 group-hover:text-ember dark:group-hover:text-amber-brand transition-colors w-8">
@@ -647,7 +919,7 @@ export default function App() {
                             <span className="text-[15px] font-bold text-ink-900 dark:text-creamtext/85 group-hover:text-ember dark:group-hover:text-amber-brand transition-colors">
                               {song.title}
                             </span>
-                          </button>
+                          </motion.button>
                         ))}
                       </div>
                     </div>
