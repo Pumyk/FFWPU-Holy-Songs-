@@ -29,9 +29,11 @@ const MAX_ZOOM = 2.5;
 
 /* ------------------------ Material Motion: expressive springs ------------------------ */
 
-/** Fast spatial spring — M3 expressive default for surface transitions */
-const SPRING = { type: 'spring', stiffness: 380, damping: 30 } as const;
-/** Softer, bouncier spring — hero moments, splash */
+/** Snappy entrance — quick ease-out tween, no spring settle time */
+const FAST = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
+/** Button press feedback — tight, quick spring */
+const TAP = { type: 'spring', stiffness: 700, damping: 26 } as const;
+/** Soft bouncy spring — splash only (one-shot) */
 const SPRING_BOUNCY = { type: 'spring', stiffness: 210, damping: 17, mass: 0.9 } as const;
 
 /* ---------------------------- Material You (dynamic color) ---------------------------- */
@@ -117,37 +119,27 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
 
         return (
           <div key={index} className="space-y-12">
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ ...SPRING, delay: 0.04 }}
+            <div
               className="relative group pl-12 md:pl-16"
             >
               {/* Floating verse number bubble */}
-              <motion.div
-                whileTap={{ scale: 0.88 }}
-                transition={SPRING}
+              <div
                 className="absolute left-0 top-0 flex items-center justify-center w-9 h-9 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-xs font-black font-mono text-ember dark:text-amber-brand group-hover:scale-110 group-hover:bg-amber-brand group-hover:text-black transition-all duration-300 shadow-sm"
               >
                 {item.number}
-              </motion.div>
+              </div>
 
               <div className="whitespace-pre-wrap tracking-[0.01em]">
                 {item.text}
               </div>
-            </motion.div>
+            </div>
 
             {/* Auto-inject Chorus after each verse */}
             {chorusText && (
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={SPRING}
+              <div
                 className="relative rounded-[28px] bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 p-6 md:p-8 overflow-hidden"
               >
-                <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-amber-brand/10 dark:bg-amber-brand/[0.07] blur-2xl pointer-events-none" />
+                <div className="absolute -top-10 -right-10 w-44 h-44 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 14%, transparent), transparent)' }} />
 
                 <div className="relative">
                   <div className="flex items-center gap-3 mb-5">
@@ -161,7 +153,7 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
                     {chorusText}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
           </div>
         );
@@ -177,12 +169,13 @@ const renderSplash = () => {
     <motion.div
       key="splash"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-cream-50 dark:bg-amoled overflow-hidden"
-      exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
-      transition={{ duration: 0.5, ease: [0.32, 0, 0.67, 0] }}
+      exit={{ opacity: 0, scale: 1.03 }}
+      transition={{ duration: 0.28, ease: [0.4, 0, 1, 1] }}
     >
       {/* Ambient accent glow */}
       <motion.div
-        className="absolute w-[22rem] h-[22rem] rounded-full bg-amber-brand/20 blur-3xl pointer-events-none"
+        className="absolute w-[22rem] h-[22rem] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 22%, transparent), transparent)' }}
         initial={{ opacity: 0, scale: 0.5 }}
         animate={{ opacity: [0, 0.9, 0.55], scale: [0.5, 1.2, 1] }}
         transition={{ duration: 1.9, times: [0, 0.35, 1] }}
@@ -202,7 +195,7 @@ const renderSplash = () => {
       <motion.h1
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ ...SPRING, delay: 0.45 }}
+        transition={{ ...FAST, delay: 0.45 }}
         className="relative mt-7 text-3xl font-black tracking-tight text-ink-900 dark:text-creamtext"
       >
         Holy Songs
@@ -212,7 +205,7 @@ const renderSplash = () => {
       <motion.p
         initial={{ y: 12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ ...SPRING, delay: 0.6 }}
+        transition={{ ...FAST, delay: 0.6 }}
         className="relative mt-2 px-6 text-center text-sm font-bold text-ink-700 dark:text-muted-warm"
       >
         Let's sing to glorify our{' '}
@@ -534,7 +527,7 @@ export default function App() {
             initial={{ opacity: 0, y: 16, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.95 }}
-            transition={SPRING}
+            transition={TAP}
             className="fixed bottom-[calc(2.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 text-cream-100 text-sm font-bold shadow-2xl whitespace-nowrap"
           >
             {toast}
@@ -543,7 +536,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-cream-50/85 dark:bg-amoled/85 backdrop-blur-xl border-b border-cream-200/60 dark:border-white/5 pt-[env(safe-area-inset-top)]">
+      <header className="sticky top-0 z-30 bg-cream-50 dark:bg-amoled border-b border-cream-200/60 dark:border-white/5 pt-[env(safe-area-inset-top)]">
         <div className="max-w-3xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <AnimatePresence mode="popLayout" initial={false}>
@@ -553,7 +546,7 @@ export default function App() {
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -6 }}
-                  transition={SPRING}
+                  transition={TAP}
                   whileTap={{ scale: 0.9 }}
                   onClick={goBack}
                   className="p-2.5 -ml-2 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
@@ -567,7 +560,7 @@ export default function App() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  transition={SPRING}
+                  transition={TAP}
                   className="flex items-center justify-center w-10 h-10 rounded-2xl bg-black dark:bg-night-800 border border-white/5 shadow-lg overflow-hidden"
                 >
                   <img
@@ -585,7 +578,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <motion.button
               whileTap={{ scale: 0.88 }}
-              transition={SPRING}
+              transition={TAP}
               onClick={() => setDynamicColor(v => !v)}
               className={`relative p-2.5 rounded-full border transition-all ${
                 dynamicColor
@@ -602,7 +595,7 @@ export default function App() {
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.88 }}
-              transition={SPRING}
+              transition={TAP}
               onClick={goTOC}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Table of Contents"
@@ -611,7 +604,7 @@ export default function App() {
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.88 }}
-              transition={SPRING}
+              transition={TAP}
               onClick={toggleTheme}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Toggle theme"
@@ -627,15 +620,15 @@ export default function App() {
           {selectedSong ? (
             <motion.div
               key={`song-${selectedSong.id}`}
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={SPRING}
+              exit={{ opacity: 0, y: -6 }}
+              transition={FAST}
               className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
             >
               {/* Song Detail Header */}
               <div className="px-5 md:px-8 pt-10 md:pt-16 max-w-2xl mx-auto relative">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-72 h-32 bg-amber-brand/15 dark:bg-amber-brand/10 blur-3xl rounded-full pointer-events-none" />
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-80 h-44 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 18%, transparent), transparent)' }} />
 
                 <div className="relative">
                   <div className="flex flex-wrap items-center gap-2.5 mb-6">
@@ -674,10 +667,10 @@ export default function App() {
               <div className="px-5 md:px-8 max-w-2xl mx-auto">
                 {/* Zoom toolbar */}
                 <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 flex justify-end -mt-2 mb-5">
-                  <div className="flex items-center gap-0.5 rounded-full bg-ink-900/95 dark:bg-night-800/95 backdrop-blur-xl border border-white/10 shadow-xl px-1 py-1">
+                  <div className="flex items-center gap-0.5 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 shadow-xl px-1 py-1">
                     <motion.button
                       whileTap={{ scale: 0.85 }}
-                      transition={SPRING}
+                      transition={TAP}
                       onClick={() => changeZoom(-0.15)}
                       disabled={zoom <= MIN_ZOOM}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
@@ -690,7 +683,7 @@ export default function App() {
                     </span>
                     <motion.button
                       whileTap={{ scale: 0.85 }}
-                      transition={SPRING}
+                      transition={TAP}
                       onClick={() => changeZoom(0.15)}
                       disabled={zoom >= MAX_ZOOM}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
@@ -700,7 +693,7 @@ export default function App() {
                     </motion.button>
                     <motion.button
                       whileTap={{ scale: 0.85 }}
-                      transition={SPRING}
+                      transition={TAP}
                       onClick={() => setZoom(1)}
                       disabled={zoom === 1}
                       className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25 transition-colors"
@@ -723,10 +716,10 @@ export default function App() {
 
                 {/* Floating Navigation */}
                 <div className="sticky bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-10 mt-16">
-                  <div className="flex items-center gap-3 p-2 rounded-[28px] bg-ink-900/95 dark:bg-night-800/95 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/40">
+                  <div className="flex items-center gap-3 p-2 rounded-[28px] bg-ink-900 dark:bg-night-800 border border-white/10 shadow-2xl shadow-black/40">
                     <motion.button
                       whileTap={{ scale: 0.95 }}
-                      transition={SPRING}
+                      transition={TAP}
                       onClick={handlePrevious}
                       disabled={currentSongIndex <= 0}
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[22px] text-cream-100 font-bold text-sm hover:bg-white/10 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
@@ -737,7 +730,7 @@ export default function App() {
                     <div className="w-px h-8 bg-white/10" />
                     <motion.button
                       whileTap={{ scale: 0.95 }}
-                      transition={SPRING}
+                      transition={TAP}
                       onClick={handleNext}
                       disabled={currentSongIndex >= navigationList.length - 1}
                       className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[22px] bg-amber-brand text-black font-bold text-sm hover:bg-amber-brand/90 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
@@ -760,7 +753,7 @@ export default function App() {
             >
               {/* Hero */}
               <div className="px-5 pt-10 pb-6 max-w-2xl mx-auto w-full relative">
-                <div className="absolute top-4 right-2 w-56 h-24 bg-amber-brand/15 dark:bg-amber-brand/10 blur-3xl rounded-full pointer-events-none" />
+                <div className="absolute top-4 right-2 w-64 h-28 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 16%, transparent), transparent)' }} />
                 <h2 className="relative text-[1.75rem] md:text-[2.25rem] font-black tracking-tight leading-[1.15] text-ink-900 dark:text-creamtext">
                   Let's sing to glorify our <span className="text-ember dark:text-amber-brand italic font-serif">Heavenly Parent</span>
                 </h2>
@@ -777,7 +770,7 @@ export default function App() {
               </div>
 
               {/* Search Bar */}
-              <div className="px-5 pb-4 sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 bg-cream-50/90 dark:bg-amoled/90 backdrop-blur-xl">
+              <div className="px-5 pb-4 sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 bg-cream-50 dark:bg-amoled">
                 <div className="relative max-w-2xl mx-auto w-full">
                   <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
                     <Search className="h-[18px] w-[18px] text-ink-500 dark:text-muted-warm" />
@@ -808,9 +801,9 @@ export default function App() {
                     {filteredSongs.map((song) => (
                       <motion.button
                         key={song.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={SPRING}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={TAP}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => goSong(song)}
                         className="w-full text-left p-4 rounded-[24px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 dark:hover:border-amber-brand/30 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all group flex items-center gap-4"
@@ -871,7 +864,7 @@ export default function App() {
                   </div>
                   <motion.button
                     whileTap={{ scale: 0.88 }}
-                    transition={SPRING}
+                    transition={TAP}
                     onClick={goBack}
                     className="p-3 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-ink-700 dark:text-creamtext hover:bg-cream-200 dark:hover:bg-night-700 transition-all"
                     aria-label="Close contents"
@@ -909,7 +902,7 @@ export default function App() {
                           <motion.button
                             key={song.id}
                             whileTap={{ scale: 0.985 }}
-                            transition={SPRING}
+                            transition={TAP}
                             onClick={() => goSong(song)}
                             className="flex items-baseline gap-4 py-3 group text-left border-b border-transparent hover:border-amber-brand/30 rounded-lg px-2 -mx-2 hover:bg-amber-brand/[0.06] transition-all"
                           >
