@@ -626,7 +626,7 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
 
 export default function BooksPage() {
   const [reading, setReading] = useState(false);
-  const [pdf, setPdf] = useState<{ src: string; title: string; author: string } | null>(null);
+  const [pdf, setPdf] = useState<{ src: string; title: string; author: string; progressKey?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const book = useBook();
 
@@ -637,12 +637,13 @@ export default function BooksPage() {
       src: URL.createObjectURL(f),
       title: f.name.replace(/\.pdf$/i, ''),
       author: 'From your device',
+      progressKey: `file:${f.name}`,
     });
     e.target.value = '';
   };
 
   if (pdf) {
-    return <PdfReader src={pdf.src} title={pdf.title} author={pdf.author} onClose={() => setPdf(null)} />;
+    return <PdfReader src={pdf.src} title={pdf.title} author={pdf.author} progressKey={pdf.progressKey} onClose={() => setPdf(null)} />;
   }
   return reading && book ? (
     <Reader book={book} onClose={() => setReading(false)} />
