@@ -15,12 +15,24 @@ interface PageDims { width: number; height: number }
 interface FindHit { page: number; snippet: string }
 
 export default function PdfReader({
-  src, title, author, onClose,
-}: { src: string; title: string; author: string; onClose: () => void }) {
+  src, title, author, progressKey, onClose,
+}: {
+  src: string;
+  title: string;
+  author: string;
+  progressKey?: string;
+  onClose: () => void;
+}) {
+  const storeKey = `hphc:pdf-progress:${progressKey ?? src}`;
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [dims, setDims] = useState<PageDims[]>([]);
-  const [scale, setScale] = useState(1);
+  const dimsRef = useRef<PageDims[]>([]);
+  useEffect(() => { dimsRef.current = dims; }, [dims]);
+  const [scale, setScale] = useState(() => {
+    const z = Number(localStorage.getItem(storeKey + ':zoom'));
+    return z >= MIN_ZOOM && z <= MAX_ZOOM ? z : 1;
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
@@ -36,6 +48,7 @@ export default function PdfReader({
   const findInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const pdfjsRef = useRef<typeof import('pdfjs-dist') | null>(null);
+  const resumedRef = useRef(false);
   const pinchDist = useRef<number | null>(null);
 
   /* ------------------------------ load document ---------------------------- */
@@ -50,18 +63,13 @@ export default function PdfReader({
         ).toString();
         if (!alive) return;
         pdfjsRef.current = pdfjs;
-        const d = await pdfjs.getDocument({ url: src }).promise;
+        const d = await pdfjs.getDocument({
+          url: src,
+          standardFontDataUrl: new URL('./pdfjs/standard_fonts/', document.baseURI).toString(),
+          useSystemFonts: false,
+        }).promise;
         if (!alive) { void d.destroy(); return; }
         setDoc(d);
-        // page dimensions for stable scroll height
-        const ds: PageDims[] = [];
-        for (let i = 1; i <= d.numPages; i++) {
-          const p = await d.getPage(i);
-          const v = p.getViewport({ scale: 1 });
-          ds.push({ width: v.width, height: v.height });
-          if (i % 50 === 0 && alive) setDims([...ds]);
-        }
-        if (alive) setDims(ds);
       } catch (e) {
         console.error('pdf load failed', e);
         if (alive) setLoadError(true);
@@ -69,6 +77,34 @@ export default function PdfReader({
     })();
     return () => { alive = false; };
   }, [src]);
+
+  /* --------------------- first-page dims + resume position ----------------- */
+  useEffect(() => {
+    if (!doc) return;
+    let alive = true;
+    (async () => {
+      const p = await doc.getPage(1);
+      const v = p.getViewport({ scale: 1 });
+      if (!alive) return;
+      setDims([{ width: v.width, height: v.height }]);
+
+      // resume last position (page + zoom persisted in localStorage)
+      const saved = Number(localStorage.getItem(storeKey + ':page'));
+      if (Number.isFinite(saved) && saved > 1 && saved <= doc.numPages) {
+        requestAnimationFrame(() => {
+          const sc = scrollRef.current;
+          if (!sc) { resumedRef.current = true; return; }
+          const avg = (sc.scrollHeight || 0) / doc.numPages;
+          sc.scrollTop = Math.max(0, (saved - 1) * avg);
+          setCurrentPage(saved);
+          resumedRef.current = true;
+        });
+      } else {
+        resumedRef.current = true;
+      }
+    })();
+    return () => { alive = false; };
+  }, [doc, storeKey]);
 
   /* ------------------------------ render pages ----------------------------- */
   const renderPage = useCallback(async (i: number) => {
@@ -81,6 +117,15 @@ export default function PdfReader({
     renderedAt.current.set(i, scale);
     try {
       const page = await doc.getPage(i);
+      const v1 = page.getViewport({ scale: 1 });
+      const cur = dimsRef.current[i - 1];
+      if (!cur || Math.abs(cur.height - v1.height) > 2 || Math.abs(cur.width - v1.width) > 2) {
+        setDims((prev) => {
+          const next = prev.length >= i ? [...prev] : Array.from({ length: i }, (_, k) => prev[k] ?? prev[0]);
+          next[i - 1] = { width: v1.width, height: v1.height };
+          return next;
+        });
+      }
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const v = page.getViewport({ scale: scale * dpr });
       canvas.width = Math.floor(v.width);
@@ -110,6 +155,15 @@ export default function PdfReader({
     pageRefs.current.forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, [doc, dims, scale, renderPage]);
+
+  /* ------------------------------ progress saving -------------------------- */
+  useEffect(() => {
+    if (!doc || !resumedRef.current) return;
+    localStorage.setItem(storeKey + ':page', String(currentPage));
+  }, [currentPage, doc, storeKey]);
+  useEffect(() => {
+    localStorage.setItem(storeKey + ':zoom', String(scale));
+  }, [scale, storeKey]);
 
   /* ------------------------------ page tracking ---------------------------- */
   useEffect(() => {
@@ -325,7 +379,7 @@ export default function PdfReader({
 
       {/* page counter + page nav, in-flow bottom (reserved space keeps it off text) */}
       {doc && (
-        <div className="border-t border-cream-200/60 dark:border-white/5 bg-cream-50 dark:bg-amoled px-4 py-2 flex-shrink-0">
+        <div className="border-t border-cream-200/60 dark:border-white/5 bg-cream-50 dark:bg-amoled px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex-shrink-0">
           <div className="max-w-2xl mx-auto flex items-center justify-center gap-3">
             <button onClick={() => goPage(-1)} disabled={currentPage <= 1}
               className="p-2 rounded-full text-ink-700 dark:text-muted-warm hover:bg-cream-100 dark:hover:bg-night-800 disabled:opacity-25" aria-label="Previous page">
