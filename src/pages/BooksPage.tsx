@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Library, BookOpen, ChevronLeft, ChevronRight, FileText, ListTree, Maximize2, Minimize2, Search, ZoomIn, ZoomOut, RotateCcw, X } from 'lucide-react';
 import exposition from '../data/books/exposition.json';
+import PdfReader from './PdfReader';
+import { FileUp, Feather } from 'lucide-react';
 
 const TAP = { type: 'spring', stiffness: 700, damping: 26 } as const;
 const FAST = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
@@ -113,7 +115,14 @@ const snippetAround = (text: string, q: string): SearchHit['snippet'] => {
 
 /* --------------------------------- Shelf --------------------------------- */
 
-function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
+function Shelf({
+  book, onOpen, onOpenPdf, onPickDevicePdf,
+}: {
+  book: Book | null;
+  onOpen: () => void;
+  onOpenPdf: (src: string, title: string, author: string) => void;
+  onPickDevicePdf: () => void;
+}) {
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div className="px-6 md:px-10 pt-10 md:pt-16 max-w-2xl mx-auto relative">
@@ -161,11 +170,77 @@ function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
           <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
         </motion.button>
 
-        <div className="rounded-[28px] border border-dashed border-cream-200 dark:border-white/[0.08] p-6 text-center">
-          <p className="text-sm font-semibold text-ink-700 dark:text-muted-warm">
-            More titles will be added in future updates.
-          </p>
-        </div>
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={FAST}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onOpenPdf('books/mother-of-peace.pdf', 'Mother of Peace', 'Dr. Hak Ja Han Moon')}
+          className="w-full text-left rounded-[28px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all p-6 flex items-center gap-5 group"
+        >
+          <div className="flex-shrink-0 w-16 h-20 rounded-2xl bg-amber-brand/90 border border-black/5 flex items-center justify-center shadow-lg group-hover:bg-amber-brand transition-colors">
+            <Feather className="w-7 h-7 text-black" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-extrabold text-ink-900 dark:text-creamtext leading-snug">
+              Mother of Peace
+            </h3>
+            <p className="text-xs font-bold text-ink-700 dark:text-muted-warm mt-1.5 uppercase tracking-[0.12em]">
+              Dr. Hak Ja Han Moon · Memoir (2020)
+            </p>
+            <p className="text-xs font-semibold text-ink-700 dark:text-muted-warm mt-2">
+              PDF · 369 pages · in-app PDF reader with search
+            </p>
+          </div>
+          <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
+        </motion.button>
+
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={FAST}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onOpenPdf('books/way-of-tradition-vol1.pdf', 'The Way of Tradition, Vol. I', 'Rev. Sun Myung Moon')}
+          className="w-full text-left rounded-[28px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all p-6 flex items-center gap-5 group"
+        >
+          <div className="flex-shrink-0 w-16 h-20 rounded-2xl bg-ink-900 dark:bg-amoled border border-white/10 flex items-center justify-center shadow-lg group-hover:bg-amber-brand transition-colors">
+            <FileText className="w-7 h-7 text-amber-brand group-hover:text-black transition-colors" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-extrabold text-ink-900 dark:text-creamtext leading-snug">
+              The Way of Tradition, Volume I
+            </h3>
+            <p className="text-xs font-bold text-ink-700 dark:text-muted-warm mt-1.5 uppercase tracking-[0.12em]">
+              Rev. Sun Myung Moon · Selected passages
+            </p>
+            <p className="text-xs font-semibold text-ink-700 dark:text-muted-warm mt-2">
+              PDF · 315 pages · in-app PDF reader with search
+            </p>
+          </div>
+          <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
+        </motion.button>
+
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={FAST}
+          whileTap={{ scale: 0.98 }}
+          onClick={onPickDevicePdf}
+          className="w-full text-left rounded-[28px] border border-dashed border-cream-300 dark:border-white/[0.12] hover:border-amber-brand/50 hover:bg-cream-100/60 dark:hover:bg-night-800/60 transition-all p-5 flex items-center gap-4 group"
+        >
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 flex items-center justify-center group-hover:bg-amber-brand/15">
+            <FileUp className="w-5 h-5 text-ember dark:text-amber-brand" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-extrabold text-ink-900 dark:text-creamtext leading-snug">
+              Open a PDF from your device
+            </h3>
+            <p className="text-xs font-semibold text-ink-700 dark:text-muted-warm mt-1">
+              Read any PDF you have saved, right inside the app
+            </p>
+          </div>
+          <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
+        </motion.button>
       </div>
     </div>
   );
@@ -551,10 +626,35 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
 
 export default function BooksPage() {
   const [reading, setReading] = useState(false);
+  const [pdf, setPdf] = useState<{ src: string; title: string; author: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const book = useBook();
+
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPdf({
+      src: URL.createObjectURL(f),
+      title: f.name.replace(/\.pdf$/i, ''),
+      author: 'From your device',
+    });
+    e.target.value = '';
+  };
+
+  if (pdf) {
+    return <PdfReader src={pdf.src} title={pdf.title} author={pdf.author} onClose={() => setPdf(null)} />;
+  }
   return reading && book ? (
     <Reader book={book} onClose={() => setReading(false)} />
   ) : (
-    <Shelf book={book} onOpen={() => setReading(true)} />
+    <>
+      <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFile} />
+      <Shelf
+        book={book}
+        onOpen={() => setReading(true)}
+        onOpenPdf={(src, title, author) => setPdf({ src, title, author })}
+        onPickDevicePdf={() => fileInputRef.current?.click()}
+      />
+    </>
   );
 }
