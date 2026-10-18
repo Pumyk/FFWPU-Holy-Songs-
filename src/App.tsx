@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo, useRef, type TouchEvent as ReactTouchEvent } from 'react';
-import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, HeartHandshake } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, HeartHandshake, Menu, ScrollText, Library, Newspaper } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song } from './types';
 import songsHtml from './songs.html?raw';
+import PledgePage from './pages/PledgePage';
+import BooksPage from './pages/BooksPage';
+import NewsPage from './pages/NewsPage';
 
 /* ---------- Local songbook, bundled at build time (instant, offline) ---------- */
 
@@ -184,7 +187,7 @@ const renderSplash = () => {
         transition={{ ...SPRING_BOUNCY, delay: 0.08 }}
         className="relative flex items-center justify-center w-24 h-24 rounded-[28px] bg-black dark:bg-night-800 border border-white/10 shadow-2xl shadow-black/30 overflow-hidden"
       >
-        <img src="/icon.svg" alt="Holy Songs" className="w-full h-full p-4" />
+        <img src="/icon.svg" alt="HPHC Library" className="w-full h-full p-4" />
       </motion.div>
 
       {/* Title */}
@@ -194,7 +197,7 @@ const renderSplash = () => {
         transition={{ ...FAST, delay: 0.25 }}
         className="relative mt-7 text-3xl font-black tracking-tight text-ink-900 dark:text-creamtext"
       >
-        Holy Songs
+        HPHC Library
       </motion.h1>
 
       {/* Subtitle */}
@@ -204,8 +207,8 @@ const renderSplash = () => {
         transition={{ ...FAST, delay: 0.38 }}
         className="relative mt-2 px-6 text-center text-sm font-bold text-ink-700 dark:text-muted-warm"
       >
-        Let's sing to glorify our{' '}
-        <span className="text-ember dark:text-amber-brand italic font-serif">Heavenly Parent</span>
+        <span className="text-ember dark:text-amber-brand">Holy Songs</span>
+        {' \u00B7 '}Family Pledge{' \u00B7 '}Books{' \u00B7 '}News
       </motion.p>
 
       {/* Loading bar */}
@@ -228,7 +231,19 @@ const renderSplash = () => {
 
 /* ---------------------------------- App ---------------------------------- */
 
-type NavState = { hs: 'song'; id: string } | { hs: 'toc' } | null;
+type Section = 'pledge' | 'books' | 'news';
+type NavState =
+  | { hs: 'song'; id: string }
+  | { hs: 'toc' }
+  | { hs: 'drawer' }
+  | { hs: Section }
+  | null;
+
+const SECTION_META: Record<Section, { label: string; desc: string; icon: typeof Music2 }> = {
+  pledge: { label: 'Family Pledge', desc: 'The eight pledges', icon: ScrollText },
+  books: { label: 'Books', desc: 'Core teachings library', icon: Library },
+  news: { label: 'HJ Global News', desc: 'Latest English edition', icon: Newspaper },
+};
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -243,6 +258,8 @@ export default function App() {
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [songs, setSongs] = useState<Song[]>(LOCAL_SONGS);
   const [isTOCOpen, setIsTOCOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<Section | null>(null);
   const [tocSearchQuery, setTocSearchQuery] = useState('');
   const [zoom, setZoom] = useState(1);
   const [showSplash, setShowSplash] = useState(true);
@@ -337,17 +354,25 @@ export default function App() {
      "press again to exit" toast on Android. */
 
   const applyNav = (st: NavState) => {
-    if (st?.hs === 'song') {
+    const hs = st?.hs;
+    if (hs === 'song') {
       const s = songsRef.current.find(x => x.id === st.id) || null;
       setSelectedSong(s);
       setIsTOCOpen(false);
+      setIsDrawerOpen(false);
+      setActiveSection(null);
       window.scrollTo(0, 0);
-    } else if (st?.hs === 'toc') {
+    } else if (hs === 'toc') {
       setIsTOCOpen(true);
+    } else if (hs === 'drawer') {
+      setIsDrawerOpen(true);
     } else {
       setSelectedSong(null);
       setIsTOCOpen(false);
+      setIsDrawerOpen(false);
       setTocSearchQuery('');
+      setActiveSection(hs === 'pledge' || hs === 'books' || hs === 'news' ? hs : null);
+      if (hs) window.scrollTo(0, 0);
     }
   };
 
@@ -359,7 +384,16 @@ export default function App() {
 
   const goSong = (song: Song) => pushNav({ hs: 'song', id: song.id });
   const goTOC = () => pushNav({ hs: 'toc' });
+  const goDrawer = () => pushNav({ hs: 'drawer' });
   const goBack = () => window.history.back();
+
+  /* Drawer selection replaces the drawer entry with the chosen section,
+     so back from a section returns to what was on screen before the menu. */
+  const selectSection = (sec: Section | 'songs') => {
+    const st: NavState = sec === 'songs' ? null : { hs: sec };
+    window.history.replaceState(st, '');
+    applyNav(st);
+  };
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => applyNav((e.state as NavState) ?? null);
@@ -527,6 +561,15 @@ export default function App() {
       <header className="sticky top-0 z-30 bg-cream-50 dark:bg-amoled border-b border-cream-200/60 dark:border-white/5 pt-[env(safe-area-inset-top)]">
         <div className="max-w-3xl mx-auto px-5 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              transition={TAP}
+              onClick={goDrawer}
+              className="p-2.5 -ml-2 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
+              aria-label="Open menu"
+            >
+              <Menu className="w-[18px] h-[18px]" />
+            </motion.button>
             <AnimatePresence mode="popLayout" initial={false}>
               {selectedSong ? (
                 <motion.button
@@ -553,26 +596,37 @@ export default function App() {
                 >
                   <img
                     src="/icon.svg"
-                    alt="Holy Song Book Logo"
+                    alt="HPHC Library Logo"
                     className="w-full h-full object-contain p-1"
                   />
                 </motion.div>
               )}
             </AnimatePresence>
             <h1 className="text-base font-extrabold tracking-tight truncate text-ink-900 dark:text-creamtext">
-              {selectedSong ? selectedSong.title : "Holy Songs"}
+              {selectedSong
+                ? selectedSong.title
+                : activeSection
+                  ? SECTION_META[activeSection].label
+                  : "HPHC Library"}
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <AnimatePresence initial={false}>
+            {!activeSection && (
             <motion.button
-              whileTap={{ scale: 0.88 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
               transition={TAP}
+              whileTap={{ scale: 0.88 }}
               onClick={goTOC}
               className="p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 hover:bg-cream-200 dark:hover:bg-night-700 text-ink-700 dark:text-creamtext"
               aria-label="Table of Contents"
             >
               <Book className="w-[18px] h-[18px]" />
             </motion.button>
+            )}
+            </AnimatePresence>
             <motion.button
               whileTap={{ scale: 0.88 }}
               transition={TAP}
@@ -713,6 +767,36 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+          ) : activeSection === 'pledge' ? (
+            <motion.div
+              key="pledge"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={FAST}
+            >
+              <PledgePage />
+            </motion.div>
+          ) : activeSection === 'books' ? (
+            <motion.div
+              key="books"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={FAST}
+            >
+              <BooksPage />
+            </motion.div>
+          ) : activeSection === 'news' ? (
+            <motion.div
+              key="news"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={FAST}
+            >
+              <NewsPage />
+            </motion.div>
           ) : (
             <motion.div
               key="list"
@@ -809,6 +893,103 @@ export default function App() {
                 )}
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Navigation Drawer */}
+        <AnimatePresence>
+          {isDrawerOpen && (
+            <div className="fixed inset-0 z-[60]">
+              <motion.div
+                key="drawer-scrim"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={goBack}
+                className="absolute inset-0 bg-black/45"
+              />
+              <motion.div
+                key="drawer-panel"
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', stiffness: 520, damping: 40 }}
+                className="absolute inset-y-0 left-0 w-[82%] max-w-[320px] bg-cream-50 dark:bg-night-900 border-r border-cream-200 dark:border-white/5 overflow-y-auto pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] shadow-2xl"
+              >
+                {/* Brand */}
+                <div className="px-6 flex items-center gap-3.5 mb-10">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-black dark:bg-night-800 border border-white/5 shadow-lg overflow-hidden">
+                    <img src="/icon.svg" alt="HPHC Library" className="w-full h-full object-contain p-1.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black tracking-tight text-ink-900 dark:text-creamtext">
+                      HPHC Library
+                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-ink-700 dark:text-muted-warm mt-0.5">
+                      One home for everything
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sections */}
+                <nav className="px-4 space-y-1.5">
+                  <button
+                    onClick={() => selectSection('songs')}
+                    className={`w-full flex items-center gap-4 p-3.5 rounded-[22px] transition-all ${
+                      !selectedSong && !activeSection
+                        ? 'bg-amber-brand/15 dark:bg-amber-brand/10'
+                        : 'hover:bg-cream-100 dark:hover:bg-night-800'
+                    }`}
+                  >
+                    <span className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-2xl ${
+                      !selectedSong && !activeSection
+                        ? 'bg-amber-brand text-black'
+                        : 'bg-cream-100 dark:bg-night-800 text-ink-700 dark:text-creamtext'
+                    }`}>
+                      <Music2 className="w-5 h-5" />
+                    </span>
+                    <span className="flex-1 text-left">
+                      <span className="block text-sm font-extrabold text-ink-900 dark:text-creamtext">Holy Songs</span>
+                      <span className="block text-[11px] font-semibold text-ink-700 dark:text-muted-warm">The full songbook</span>
+                    </span>
+                  </button>
+
+                  {(Object.keys(SECTION_META) as Section[]).map((sec) => {
+                    const meta = SECTION_META[sec];
+                    const Icon = meta.icon;
+                    const active = activeSection === sec;
+                    return (
+                      <button
+                        key={sec}
+                        onClick={() => selectSection(sec)}
+                        className={`w-full flex items-center gap-4 p-3.5 rounded-[22px] transition-all ${
+                          active
+                            ? 'bg-amber-brand/15 dark:bg-amber-brand/10'
+                            : 'hover:bg-cream-100 dark:hover:bg-night-800'
+                        }`}
+                      >
+                        <span className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-2xl ${
+                          active
+                            ? 'bg-amber-brand text-black'
+                            : 'bg-cream-100 dark:bg-night-800 text-ink-700 dark:text-creamtext'
+                        }`}>
+                          <Icon className="w-5 h-5" />
+                        </span>
+                        <span className="flex-1 text-left">
+                          <span className="block text-sm font-extrabold text-ink-900 dark:text-creamtext">{meta.label}</span>
+                          <span className="block text-[11px] font-semibold text-ink-700 dark:text-muted-warm">{meta.desc}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <p className="px-6 pt-10 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-700/60 dark:text-muted-warm/60">
+                  Heavenly Parent's Holy Community
+                </p>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 

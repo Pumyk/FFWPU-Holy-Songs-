@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.hphc.holysongs',
-  appName: 'HPHC Holy Songs',
+  appId: 'com.hphc.library',
+  appName: 'HPHC Library',
   webDir: 'dist'
 };
 
