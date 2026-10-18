@@ -90,17 +90,6 @@ body {
   background: rgb(245 179 1 / 0.45);
 }
 
-/* Paged reader: CSS columns act as book pages, laid out horizontally */
-.reader-columns {
-  column-fill: auto;
-  width: max-content;
-}
-.reader-pager {
-  scrollbar-width: none;
-}
-.reader-pager::-webkit-scrollbar {
-  display: none;
-}
 /* Immersive reading: hide the app header while the reader is fullscreen */
 html.reader-immersive header {
   display: none;

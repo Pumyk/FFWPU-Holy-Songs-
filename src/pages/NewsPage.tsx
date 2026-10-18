@@ -82,7 +82,7 @@ export default function NewsPage() {
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Page header */}
-      <div className="px-5 md:px-8 pt-10 md:pt-16 max-w-2xl mx-auto relative">
+      <div className="px-6 md:px-10 pt-10 md:pt-16 max-w-2xl mx-auto relative">
         <div
           className="absolute -top-4 left-1/2 -translate-x-1/2 w-80 h-44 pointer-events-none"
           style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 18%, transparent), transparent)' }}
@@ -117,7 +117,7 @@ export default function NewsPage() {
 
       {/* Latest edition, playable in-app */}
       {latest && (
-        <div className="px-5 md:px-8 max-w-2xl mx-auto mt-10">
+        <div className="px-6 md:px-10 max-w-2xl mx-auto mt-10">
           <motion.div
             key={latest.id}
             initial={{ opacity: 0 }}

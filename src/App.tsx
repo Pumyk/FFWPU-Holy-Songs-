@@ -652,7 +652,7 @@ export default function App() {
               className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
             >
               {/* Song Detail Header */}
-              <div className="px-5 md:px-8 pt-10 md:pt-16 max-w-2xl mx-auto relative">
+              <div className="px-6 md:px-10 pt-10 md:pt-16 max-w-2xl mx-auto relative">
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-80 h-44 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 18%, transparent), transparent)' }} />
 
                 <div className="relative">
@@ -689,9 +689,9 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="px-5 md:px-8 max-w-2xl mx-auto">
-                {/* Zoom toolbar */}
-                <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 flex justify-end -mt-2 mb-5">
+              <div className="px-6 md:px-10 max-w-2xl mx-auto">
+                {/* Zoom toolbar: in-flow so it never covers lyric text */}
+                <div className="flex justify-end mb-5">
                   <div className="flex items-center gap-0.5 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 shadow-xl px-1 py-1">
                     <motion.button
                       whileTap={{ scale: 0.85 }}
@@ -807,7 +807,7 @@ export default function App() {
               className="flex flex-col min-h-[calc(100vh-4rem)]"
             >
               {/* Hero */}
-              <div className="px-5 pt-10 pb-6 max-w-2xl mx-auto w-full relative">
+              <div className="px-6 md:px-10 pt-10 pb-6 max-w-2xl mx-auto w-full relative">
                 <div className="absolute top-4 right-2 w-64 h-28 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 16%, transparent), transparent)' }} />
                 <h2 className="relative text-[1.75rem] md:text-[2.25rem] font-black tracking-tight leading-[1.15] text-ink-900 dark:text-creamtext">
                   Let's sing to glorify our <span className="text-ember dark:text-amber-brand italic font-serif">Heavenly Parent</span>
@@ -850,7 +850,7 @@ export default function App() {
               </div>
 
               {/* Song List */}
-              <div className="flex-1 px-5 pb-[calc(6rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full">
+              <div className="flex-1 px-6 md:px-10 pb-[calc(6rem+env(safe-area-inset-bottom))] max-w-2xl mx-auto w-full">
                 {filteredSongs.length > 0 ? (
                   <div className="space-y-2.5">
                     {filteredSongs.map((song) => (
