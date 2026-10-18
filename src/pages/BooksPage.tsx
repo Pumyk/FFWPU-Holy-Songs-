@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useMemo, type TouchEvent as ReactTouchEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Library, BookOpen, ChevronLeft, ChevronRight, FileText, ListTree, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, X } from 'lucide-react';
+import { Library, BookOpen, ChevronLeft, ChevronRight, FileText, ListTree, Maximize2, Minimize2, Search, ZoomIn, ZoomOut, RotateCcw, X } from 'lucide-react';
 import exposition from '../data/books/exposition.json';
 
 const TAP = { type: 'spring', stiffness: 700, damping: 26 } as const;
@@ -61,22 +61,62 @@ const buildGroups = (book: Book): ChapterGroup[] => {
   return groups.filter((g) => g.chapters.length > 0);
 };
 
-/** 'Part 1 · Chapter 1: The Principle of Creation' -> 'Ch 1 · The Principle of Creation' */
+/** 'Part 1 · Chapter 1: The Principle of Creation' -> 'Ch 1: The Principle of Creation' */
 const chapterShort = (t: string) =>
   t.startsWith('Part ')
     ? t.split(' · ')[1].replace(/^Chapter /, 'Ch ')
     : t;
 
 /** group label for the chapter currently open */
-const groupOf = (book: Book, groups: ChapterGroup[], idx: number) =>
+const groupOf = (groups: ChapterGroup[], idx: number) =>
   groups.find((g) => g.chapters.includes(idx));
+
+/* ------------------------------ Find (fast index) ------------------------- */
+
+interface SearchHit {
+  chapter: number;
+  block: number;
+  snippet: { before: string; match: string; after: string };
+}
+
+/* Builds a token -> block index once per book (a few milliseconds),
+   so every search afterwards is an instant set intersection. */
+function buildIndex(book: Book): Map<string, Set<string>> {
+  const idx = new Map<string, Set<string>>();
+  book.chapters.forEach((ch, c) =>
+    ch.blocks.forEach((b, bi) => {
+      const key = `${c}:${bi}`;
+      const words = b.text.toLowerCase().match(/[a-z]+/g) ?? [];
+      for (const w of words) {
+        let set = idx.get(w);
+        if (!set) {
+          set = new Set();
+          idx.set(w, set);
+        }
+        set.add(key);
+      }
+    })
+  );
+  return idx;
+}
+
+const snippetAround = (text: string, q: string): SearchHit['snippet'] => {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return { before: text.slice(0, 90), match: '', after: text.slice(90, 160) };
+  const start = Math.max(0, i - 70);
+  return {
+    before: (start > 0 ? '\u2026' : '') + text.slice(start, i),
+    match: text.slice(i, i + q.length),
+    after: text.slice(i + q.length, i + q.length + 90),
+  };
+};
 
 /* --------------------------------- Shelf --------------------------------- */
 
 function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      <div className="px-5 md:px-8 pt-10 md:pt-16 max-w-2xl mx-auto relative">
+      <div className="px-6 md:px-10 pt-10 md:pt-16 max-w-2xl mx-auto relative">
         <div
           className="absolute -top-4 left-1/2 -translate-x-1/2 w-80 h-44 pointer-events-none"
           style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 18%, transparent), transparent)' }}
@@ -95,7 +135,7 @@ function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
         </div>
       </div>
 
-      <div className="px-5 md:px-8 max-w-2xl mx-auto mt-10 space-y-4">
+      <div className="px-6 md:px-10 max-w-2xl mx-auto mt-10 space-y-4">
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -115,7 +155,7 @@ function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
               Hyo Won Eu · 1996 authorized translation
             </p>
             <p className="text-xs font-semibold text-ink-700 dark:text-muted-warm mt-2">
-              {book ? '2 parts · 17 chapters · paged reader' : 'Loading…'}
+              {book ? '2 parts · 17 chapters · full-text search' : 'Loading…'}
             </p>
           </div>
           <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
@@ -131,70 +171,27 @@ function Shelf({ book, onOpen }: { book: Book | null; onOpen: () => void }) {
   );
 }
 
-/* ------------------------------ Paged reader ------------------------------ */
+/* -------------------------------- Reader ---------------------------------- */
 
 const MIN_ZOOM = 0.85;
 const MAX_ZOOM = 1.7;
-const PAGE_PAD = 20; // px breathing room on each side of a page
 
 function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
   const [chapter, setChapter] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [immersive, setImmersive] = useState(false);
   const [contentsOpen, setContentsOpen] = useState(false);
-  const [pageNum, setPageNum] = useState(1);
-  const [pageCount, setPageCount] = useState(1);
-
-  const chromeRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const pagerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [pagerH, setPagerH] = useState(0);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [activeBlock, setActiveBlock] = useState<number | null>(null);
+  const pendingScroll = useRef<number | null>(null);
+  const blockRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const findInputRef = useRef<HTMLInputElement>(null);
 
   const groups = useMemo(() => buildGroups(book), [book]);
+  const searchIndex = useMemo(() => buildIndex(book), [book]);
   const ch = book.chapters[chapter];
-  const grp = groupOf(book, groups, chapter);
-
-  const pinchState = useRef<{ dist: number; zoom: number } | null>(null);
-  const touchDist = (t: ReactTouchEvent['touches']) =>
-    Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-
-  /* ---- layout: pager fills the remaining viewport, pages via CSS columns ---- */
-  const recompute = () => {
-    const pager = pagerRef.current;
-    if (!pager) return;
-    const top = chromeRef.current ? chromeRef.current.getBoundingClientRect().bottom : 64;
-    const barH = bottomRef.current ? bottomRef.current.getBoundingClientRect().height : 64;
-    const h = Math.max(220, window.innerHeight - top - barH - 20);
-    setPagerH(h);
-    const w = pager.clientWidth || window.innerWidth;
-    pager.scrollTo({ left: 0 });
-    requestAnimationFrame(() => {
-      const cols = contentRef.current;
-      if (!cols) return;
-      cols.style.columnWidth = `${w - PAGE_PAD * 2}px`;
-      cols.style.columnGap = `${PAGE_PAD * 2}px`;
-      const total = Math.max(1, Math.ceil((pager.scrollWidth - w) / w) + 1);
-      setPageCount(total);
-      setPageNum(1);
-    });
-  };
-
-  useEffect(() => {
-    recompute();
-    const onResize = () => recompute();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapter, book]);
-
-  // reflow after zoom change
-  useEffect(() => {
-    const t = setTimeout(recompute, 50);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, immersive, pagerH]);
+  const grp = groupOf(groups, chapter);
 
   // immersive mode hides the app header
   useEffect(() => {
@@ -202,40 +199,56 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
     return () => document.documentElement.classList.remove('reader-immersive');
   }, [immersive]);
 
-  const pageWidth = () => pagerRef.current?.clientWidth || window.innerWidth;
+  // after a chapter change, jump to a find target if one is pending
+  useEffect(() => {
+    if (pendingScroll.current != null) {
+      const bi = pendingScroll.current;
+      pendingScroll.current = null;
+      requestAnimationFrame(() => {
+        const el = blockRefs.current.get(bi);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setActiveBlock(bi);
+          window.setTimeout(() => setActiveBlock((b) => (b === bi ? null : b)), 1400);
+        }
+      });
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [chapter]);
 
-  const goPage = (n: number) => {
-    const pager = pagerRef.current;
-    if (!pager) return;
-    const w = pageWidth();
-    const target = Math.max(0, Math.min(pageCount - 1, n - 1));
-    pager.scrollTo({ left: target * w, behavior: 'smooth' });
-    setPageNum(target + 1);
-  };
+  // search over the index: intersection of word -> block sets
+  const hits = useMemo<SearchHit[]>(() => {
+    const q = findQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const words = q.match(/[a-z]+/g) ?? [];
+    if (words.length === 0) return [];
+    let sets = words.map((w) => searchIndex.get(w));
+    if (sets.some((s) => !s)) return [];
+    let keys = sets[0]!;
+    for (const s of sets.slice(1)) keys = new Set([...keys].filter((k) => s!.has(k)));
+    const out: SearchHit[] = [];
+    for (const key of keys) {
+      const [c, b] = key.split(':').map(Number);
+      out.push({ chapter: c, block: b, snippet: snippetAround(book.chapters[c].blocks[b].text, findQuery.trim()) });
+    }
+    out.sort((a, x) => a.chapter - x.chapter || a.block - x.block);
+    return out.slice(0, 60);
+  }, [findQuery, searchIndex, book]);
 
-  const nextPage = () => {
-    if (pageNum < pageCount) goPage(pageNum + 1);
-    else if (chapter < book.chapters.length - 1) setChapter(chapter + 1);
-  };
-  const prevPage = () => {
-    if (pageNum > 1) goPage(pageNum - 1);
-    else if (chapter > 0) setChapter(chapter - 1);
-  };
-
-  const onScroll = () => {
-    const pager = pagerRef.current;
-    if (!pager) return;
-    const w = pageWidth();
-    const current = Math.round(pager.scrollLeft / w) + 1;
-    if (current !== pageNum) setPageNum(Math.min(current, pageCount));
-    if (settleTimer.current) clearTimeout(settleTimer.current);
-    settleTimer.current = setTimeout(() => {
-      const snap = Math.round(pager.scrollLeft / w);
-      if (Math.abs(pager.scrollLeft - snap * w) > 2) {
-        pager.scrollTo({ left: snap * w, behavior: 'smooth' });
+  const goToHit = (hit: SearchHit) => {
+    setFindOpen(false);
+    if (hit.chapter !== chapter) {
+      pendingScroll.current = hit.block;
+      setChapter(hit.chapter);
+    } else {
+      const el = blockRefs.current.get(hit.block);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setActiveBlock(hit.block);
+        window.setTimeout(() => setActiveBlock((b) => (b === hit.block ? null : b)), 1400);
       }
-      setPageNum(Math.min(snap + 1, pageCount));
-    }, 140);
+    }
   };
 
   const changeZoom = (delta: number) =>
@@ -246,10 +259,17 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
     if (i >= 0 && i < book.chapters.length) setChapter(i);
   };
 
+  const openFind = () => {
+    setFindOpen(true);
+    requestAnimationFrame(() => findInputRef.current?.focus());
+  };
+
   return (
     <div className="relative">
-      {/* Chrome bar */}
-      <div ref={chromeRef} className="sticky top-0 z-30 bg-cream-50 dark:bg-amoled pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-3 px-5">
+      {/* Chrome bar: navigation + zoom, sticky so text never scrolls under it */}
+      <div
+        className={`sticky ${immersive ? 'top-[env(safe-area-inset-top)]' : 'top-[calc(4rem+env(safe-area-inset-top))]'} z-20 bg-cream-50 dark:bg-amoled border-b border-cream-200/60 dark:border-white/5 pt-2 pb-2.5 px-6`}
+      >
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <motion.button
             whileTap={{ scale: 0.9 }}
@@ -272,6 +292,15 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
           <motion.button
             whileTap={{ scale: 0.88 }}
             transition={TAP}
+            onClick={openFind}
+            className="flex-shrink-0 p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-ink-700 dark:text-creamtext hover:bg-cream-200 dark:hover:bg-night-700"
+            aria-label="Find in book"
+          >
+            <Search className="w-[18px] h-[18px]" />
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.88 }}
+            transition={TAP}
             onClick={() => setContentsOpen(true)}
             className="flex-shrink-0 p-2.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-ink-700 dark:text-creamtext hover:bg-cream-200 dark:hover:bg-night-700"
             aria-label="Contents"
@@ -288,105 +317,96 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
             {immersive ? <Minimize2 className="w-[18px] h-[18px]" /> : <Maximize2 className="w-[18px] h-[18px]" />}
           </motion.button>
         </div>
+        {/* Slim zoom row, part of the chrome so it never covers text */}
+        <div className="max-w-2xl mx-auto flex items-center justify-center gap-1 pt-2">
+          <button
+            onClick={() => changeZoom(-0.15)}
+            disabled={zoom <= MIN_ZOOM}
+            className="p-1.5 rounded-full text-ink-700 dark:text-muted-warm hover:bg-cream-100 dark:hover:bg-night-800 disabled:opacity-25 transition-colors"
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-[11px] font-black font-mono text-ink-900 dark:text-creamtext w-11 text-center tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={() => changeZoom(0.15)}
+            disabled={zoom >= MAX_ZOOM}
+            className="p-1.5 rounded-full text-ink-700 dark:text-muted-warm hover:bg-cream-100 dark:hover:bg-night-800 disabled:opacity-25 transition-colors"
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setZoom(1)}
+            disabled={zoom === 1}
+            className="p-1.5 rounded-full text-ink-700 dark:text-muted-warm hover:bg-cream-100 dark:hover:bg-night-800 disabled:opacity-25 transition-colors"
+            aria-label="Reset zoom"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Paged text (CSS columns = pages; horizontal scroll = page turns) */}
+      {/* Chapter text: seamless vertical scroll */}
       <div
-        ref={pagerRef}
-        onScroll={onScroll}
-        onTouchStart={(e) => { if (e.touches.length === 2) pinchState.current = { dist: touchDist(e.touches), zoom }; }}
-        onTouchMove={(e) => {
-          if (e.touches.length === 2 && pinchState.current) {
-            const d = touchDist(e.touches);
-            setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchState.current.zoom * (d / pinchState.current.dist))));
-          }
-        }}
-        className="overflow-x-auto overflow-y-hidden reader-pager"
-        style={{ height: pagerH ? `${pagerH}px` : '60vh' }}
+        style={{ fontSize: `${1.02 * zoom}rem` }}
+        className="px-6 md:px-10 max-w-2xl mx-auto pt-8 pb-6 font-serif text-ink-900 dark:text-creamtext"
       >
-        <div
-          ref={contentRef}
-          style={{ fontSize: `${1.02 * zoom}rem`, paddingLeft: PAGE_PAD }}
-          className="h-full font-serif text-ink-900 dark:text-creamtext reader-columns"
-        >
-          {ch.blocks.map((b, i) =>
-            b.type === 'p' ? (
-              <p key={i} style={{ lineHeight: 1.75, marginBottom: '1.1em', textAlign: 'justify', hyphens: 'auto' }}>
+        {ch.blocks.map((b, i) => (
+          <div
+            key={i}
+            ref={(el) => {
+              if (el) blockRefs.current.set(i, el);
+              else blockRefs.current.delete(i);
+            }}
+            className={`rounded-lg -mx-3 px-3 transition-colors duration-700 ${activeBlock === i ? 'bg-amber-brand/15 dark:bg-amber-brand/10' : ''}`}
+          >
+            {b.type === 'p' ? (
+              <p style={{ lineHeight: 1.85, marginBottom: '1.15em', textAlign: 'justify', hyphens: 'auto' }}>
                 {b.text}
               </p>
             ) : (
               <h3
-                key={i}
                 style={{ fontSize: b.type === 'h1' ? `${1.5 * zoom}em` : `${1.22 * zoom}em` }}
-                className={`font-black pt-6 pb-1 text-ember dark:text-amber-brand ${i === 0 ? 'mt-0' : ''}`}
+                className={`font-black pt-5 pb-1 text-ember dark:text-amber-brand ${i === 0 ? 'mt-0' : ''}`}
               >
                 {b.text}
               </h3>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Bottom bar: page turner */}
-      <div ref={bottomRef} className="sticky bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 px-5 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-2xl mx-auto flex items-center gap-3 p-2 rounded-[28px] bg-ink-900 dark:bg-night-800 border border-white/10 shadow-2xl shadow-black/40">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            transition={TAP}
-            onClick={prevPage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-[22px] text-cream-100 font-bold text-sm hover:bg-white/10 transition-all"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </motion.button>
-          <div className="flex items-center gap-2 px-2">
-            <div className="flex items-center gap-1 rounded-full bg-white/10 px-1 py-1">
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                transition={TAP}
-                onClick={() => changeZoom(-0.15)}
-                disabled={zoom <= MIN_ZOOM}
-                className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25"
-                aria-label="Zoom out"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </motion.button>
-              <span className="text-[11px] font-black font-mono text-amber-brand w-11 text-center tabular-nums">
-                {Math.round(zoom * 100)}%
-              </span>
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                transition={TAP}
-                onClick={() => changeZoom(0.15)}
-                disabled={zoom >= MAX_ZOOM}
-                className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25"
-                aria-label="Zoom in"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                transition={TAP}
-                onClick={() => setZoom(1)}
-                disabled={zoom === 1}
-                className="p-2 rounded-full text-cream-100 hover:bg-white/10 disabled:opacity-25"
-                aria-label="Reset zoom"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </motion.button>
-            </div>
-            <span className="text-[11px] font-black font-mono text-cream-100/70 tabular-nums whitespace-nowrap">
-              {pageNum} / {pageCount}
-            </span>
+            )}
           </div>
+        ))}
+
+        {/* End-of-chapter navigation */}
+        <div className="grid grid-cols-2 gap-3 pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <motion.button
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.97 }}
             transition={TAP}
-            onClick={nextPage}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-[22px] bg-amber-brand text-black font-bold text-sm hover:bg-amber-brand/90 transition-all"
-            aria-label="Next page"
+            disabled={chapter === 0}
+            onClick={() => setChapter(chapter - 1)}
+            className="p-4 rounded-[22px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] text-left disabled:opacity-30 transition-all"
           >
-            <ChevronRight className="w-4 h-4" />
+            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-ink-700 dark:text-muted-warm flex items-center gap-1">
+              <ChevronLeft className="w-3 h-3" /> Previous
+            </span>
+            <span className="text-xs font-extrabold text-ink-900 dark:text-creamtext leading-snug line-clamp-2 mt-1.5">
+              {chapter > 0 ? chapterShort(book.chapters[chapter - 1].title) : 'Start of book'}
+            </span>
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            transition={TAP}
+            disabled={chapter >= book.chapters.length - 1}
+            onClick={() => setChapter(chapter + 1)}
+            className="p-4 rounded-[22px] bg-amber-brand text-black text-right disabled:opacity-30 transition-all"
+          >
+            <span className="text-[9px] font-black uppercase tracking-[0.16em] flex items-center justify-end gap-1">
+              Next <ChevronRight className="w-3 h-3" />
+            </span>
+            <span className="text-xs font-extrabold leading-snug line-clamp-2 mt-1.5">
+              {chapter < book.chapters.length - 1 ? chapterShort(book.chapters[chapter + 1].title) : 'End of book'}
+            </span>
           </motion.button>
         </div>
       </div>
@@ -400,7 +420,7 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
-            className="absolute inset-0 z-40 bg-cream-50 dark:bg-amoled overflow-y-auto px-5 pt-8 pb-10"
+            className="fixed inset-0 z-40 bg-cream-50 dark:bg-amoled overflow-y-auto px-6 pt-8 pb-10"
           >
             <div className="max-w-2xl mx-auto">
               <div className="flex items-center justify-between mb-8">
@@ -460,8 +480,68 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
         )}
       </AnimatePresence>
 
-      {/* Chapter attribution (small, below pager flow) */}
-      <p className="text-center text-[10px] font-bold uppercase tracking-[0.18em] text-ink-700/60 dark:text-muted-warm/60 pt-3 flex items-center justify-center gap-1.5">
+      {/* Find overlay with fast full-text search */}
+      <AnimatePresence>
+        {findOpen && (
+          <motion.div
+            key="find"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="fixed inset-0 z-40 bg-cream-50 dark:bg-amoled overflow-y-auto px-6 pt-8 pb-10"
+          >
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-between gap-3 mb-6">
+                <h3 className="text-2xl font-black text-ink-900 dark:text-creamtext tracking-tight">Find</h3>
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  transition={TAP}
+                  onClick={() => setFindOpen(false)}
+                  className="p-3 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-ink-700 dark:text-creamtext"
+                  aria-label="Close find"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+              </div>
+              <input
+                ref={findInputRef}
+                value={findQuery}
+                onChange={(e) => setFindQuery(e.target.value)}
+                placeholder="Search the whole book…"
+                className="w-full rounded-full bg-white dark:bg-night-800 border border-cream-200 dark:border-white/10 px-5 py-3.5 text-sm font-semibold text-ink-900 dark:text-creamtext placeholder:text-ink-700/60 dark:placeholder:text-muted-warm/60 focus:outline-none focus:border-amber-brand/50"
+              />
+              <p className="mt-3 text-[10px] font-black uppercase tracking-[0.18em] text-ink-700/70 dark:text-muted-warm/70">
+                {findQuery.trim().length < 2
+                  ? 'Type at least two letters'
+                  : `${hits.length} match${hits.length === 1 ? '' : 'es'}${hits.length >= 60 ? '+' : ''}`}
+              </p>
+              <div className="mt-5 space-y-2">
+                {hits.map((hit, i) => (
+                  <button
+                    key={`${hit.chapter}:${hit.block}`}
+                    onClick={() => goToHit(hit)}
+                    className="w-full text-left rounded-2xl bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 p-4 transition-all"
+                  >
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-ember dark:text-amber-brand flex items-center gap-1.5 mb-1.5">
+                        <FileText className="w-3 h-3" />
+                        {chapterShort(book.chapters[hit.chapter].title).slice(0, 44)}
+                      </p>
+                      <p className="text-[13px] text-ink-900 dark:text-creamtext leading-relaxed font-serif">
+                        {hit.snippet.before}
+                        <mark className="bg-amber-brand/30 dark:bg-amber-brand/20 rounded px-0.5">{hit.snippet.match}</mark>
+                        {hit.snippet.after}
+                      </p>
+                    </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Attribution */}
+      <p className="text-center text-[10px] font-bold uppercase tracking-[0.18em] text-ink-700/60 dark:text-muted-warm/60 pb-8 flex items-center justify-center gap-1.5">
         <BookOpen className="w-3 h-3" />
         Source: {book.source}
       </p>

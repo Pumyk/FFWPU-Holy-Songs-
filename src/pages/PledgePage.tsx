@@ -51,8 +51,8 @@ export default function PledgePage() {
         </div>
       </div>
 
-      {/* Zoom toolbar */}
-      <div className="px-7 md:px-10 max-w-xl mx-auto sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 flex justify-end -mt-2 mb-6">
+      {/* Zoom toolbar: in-flow, so it never covers verse text */}
+      <div className="px-7 md:px-10 max-w-xl mx-auto flex justify-end mt-8 mb-7">
         <div className="flex items-center gap-0.5 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 shadow-xl px-1 py-1">
           <motion.button
             whileTap={{ scale: 0.85 }}
