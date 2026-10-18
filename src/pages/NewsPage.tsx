@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Newspaper, Youtube, CalendarDays, Eye, RefreshCw } from 'lucide-react';
+import { Newspaper, Youtube, CalendarDays, Eye, RefreshCw, ExternalLink, Play, WifiOff } from 'lucide-react';
 import bundledNews from '../../public/news.json';
 
 const FAST = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
@@ -36,20 +36,21 @@ const loadCached = (): NewsData | null => {
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
     year: 'numeric',
   });
 
 const fmtViews = (n: number) =>
-  n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  n >= 1000 ? `${(n / 1000).toFixed(1)}K views` : `${n} views`;
 
 export default function NewsPage() {
   const [data, setData] = useState<NewsData>(
     () => loadCached() ?? (bundledNews as unknown as NewsData)
   );
   const [refreshing, setRefreshing] = useState(true);
+  const [playing, setPlaying] = useState(false);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -75,6 +76,8 @@ export default function NewsPage() {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const latest = data.items[0];
 
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -112,54 +115,101 @@ export default function NewsPage() {
         </div>
       </div>
 
-      {/* Editions */}
-      <div className="px-5 md:px-8 max-w-2xl mx-auto mt-10 space-y-3">
-        {data.items.map((item, idx) => (
-          <motion.button
-            key={item.id}
+      {/* Latest edition, playable in-app */}
+      {latest && (
+        <div className="px-5 md:px-8 max-w-2xl mx-auto mt-10">
+          <motion.div
+            key={latest.id}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ ...FAST, delay: Math.min(idx * 0.03, 0.2) }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => window.open(item.url, '_blank')}
-            className="w-full text-left rounded-[24px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all p-3.5 flex items-center gap-4 group"
+            transition={FAST}
+            className="rounded-[28px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] overflow-hidden shadow-lg shadow-black/5"
           >
-            <div className="flex-shrink-0 w-[124px] h-[70px] rounded-xl overflow-hidden bg-ink-900 dark:bg-amoled relative">
-              <img
-                src={item.thumbnail}
-                alt=""
-                loading="lazy"
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-              <span className="absolute bottom-1.5 right-1.5 flex items-center justify-center w-6 h-6 rounded-lg bg-black/80 border border-white/15">
-                <Youtube className="w-3.5 h-3.5 text-amber-brand" />
-              </span>
+            {/* Player */}
+            <div className="relative w-full bg-black" style={{ aspectRatio: '16 / 9' }}>
+              {playing ? (
+                <iframe
+                  key={latest.id}
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube-nocookie.com/embed/${latest.id}?autoplay=1&playsinline=1&rel=0`}
+                  title={latest.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                />
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  transition={TAP}
+                  onClick={() => setPlaying(true)}
+                  className="absolute inset-0 w-full h-full group"
+                  aria-label="Play in app"
+                >
+                  <img
+                    src={latest.thumbnail.replace('hqdefault', 'maxresdefault')}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (!img.dataset.fallback) {
+                        img.dataset.fallback = '1';
+                        img.src = latest.thumbnail;
+                      }
+                    }}
+                  />
+                  <span className="absolute inset-0 bg-black/25 group-hover:bg-black/15 transition-colors" />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex items-center justify-center w-16 h-16 rounded-full bg-amber-brand text-black shadow-2xl group-hover:scale-110 transition-transform">
+                      <Play className="w-7 h-7 ml-0.5 fill-black" />
+                    </span>
+                  </span>
+                  {!refreshing && navigator.onLine === false && (
+                    <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 text-[10px] font-black uppercase tracking-[0.14em] text-cream-100">
+                      <WifiOff className="w-3 h-3" />
+                      Offline
+                    </span>
+                  )}
+                </motion.button>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-extrabold text-ink-900 dark:text-creamtext leading-snug line-clamp-2">
-                {item.title}
+
+            {/* Meta */}
+            <div className="p-6">
+              <h3 className="text-lg font-extrabold text-ink-900 dark:text-creamtext leading-snug">
+                {latest.title}
               </h3>
-              <p className="text-[11px] font-bold text-ink-700 dark:text-muted-warm mt-2 inline-flex items-center gap-2 uppercase tracking-[0.1em]">
-                {fmtDate(item.date)}
-                <span className="inline-flex items-center gap-1">
+              <p className="text-[11px] font-bold text-ink-700 dark:text-muted-warm mt-2.5 inline-flex flex-wrap items-center gap-x-3 uppercase tracking-[0.12em]">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="w-3 h-3" />
+                  {fmtDate(latest.date)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
                   <Eye className="w-3 h-3" />
-                  {fmtViews(item.views)}
+                  {fmtViews(latest.views)}
                 </span>
               </p>
+              <div className="mt-5 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cream-100 dark:bg-night-700 text-[10px] font-black uppercase tracking-[0.14em] text-ink-700 dark:text-muted-warm">
+                  <Youtube className="w-3.5 h-3.5 text-ember dark:text-amber-brand" />
+                  {data.channel.title}
+                </span>
+                <a
+                  href={latest.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cream-200 dark:border-white/10 text-[10px] font-black uppercase tracking-[0.14em] text-ink-700 dark:text-muted-warm hover:text-ember dark:hover:text-amber-brand hover:border-amber-brand/40 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  YouTube
+                </a>
+              </div>
             </div>
-            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-ink-700/50 dark:text-muted-warm/50 group-hover:text-ember dark:group-hover:text-amber-brand transition-colors">
-              Watch
-            </span>
-          </motion.button>
-        ))}
+          </motion.div>
 
-        <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-ink-700/70 dark:text-muted-warm/70 pt-8 leading-relaxed">
-          Latest English editions from {data.channel.title}
-          <br />
-          Refreshed every Saturday night · opens in YouTube
-        </p>
-      </div>
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-ink-700/70 dark:text-muted-warm/70 pt-8 leading-relaxed">
+            The latest English edition, refreshed every Saturday night
+          </p>
+        </div>
+      )}
     </div>
   );
 }
