@@ -1,4 +1,6 @@
 {
+  "name": "HPHC Library",
+  "short_name": "HPHC Library",
   "icons": [
     {
       "src": "../icons/icon-48.webp",
