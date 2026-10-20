@@ -3,6 +3,7 @@ import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles
 import { motion, AnimatePresence } from 'motion/react';
 import { Song } from './types';
 import songsHtml from './songs.html?raw';
+import { fetchManifest, manifestSongs, mergeSongs, cachedManifest } from './remoteContent';
 import PledgePage from './pages/PledgePage';
 import BooksPage from './pages/BooksPage';
 import NewsPage from './pages/NewsPage';
@@ -256,7 +257,8 @@ export default function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-  const [songs, setSongs] = useState<Song[]>(LOCAL_SONGS);
+  const [remoteSongs, setRemoteSongs] = useState<Song[]>([]);
+  const songs = useMemo(() => mergeSongs(LOCAL_SONGS, remoteSongs), [remoteSongs]);
   const [isTOCOpen, setIsTOCOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<Section | null>(null);
@@ -282,40 +284,19 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2200);
   };
 
-  /* -------- Firestore sync (lazy) — UI already usable from bundled songbook -------- */
+  /* -------- Remote content sync (lazy) — UI already usable from bundled songbook -------- */
 
   useEffect(() => {
     let cancelled = false;
-    let unsubscribe: (() => void) | undefined;
-
-    const sync = async () => {
-      try {
-        const [{ db }, firestore] = await Promise.all([
-          import('./firebase'),
-          import('firebase/firestore'),
-        ]);
-        if (cancelled) return;
-        unsubscribe = firestore.onSnapshot(
-          firestore.query(firestore.collection(db, 'songs')),
-          (snapshot) => {
-            if (!cancelled && !snapshot.empty) {
-              const remote = snapshot.docs.map(doc => doc.data() as Song);
-              if (remote.length > 0) setSongs(remote);
-            }
-          },
-          () => {/* offline: keep bundled songbook */},
-        );
-      } catch {
-        /* offline: keep bundled songbook */
-      }
-    };
-
-    const id = window.setTimeout(sync, 1200);
-    return () => {
-      cancelled = true;
-      clearTimeout(id);
-      unsubscribe?.();
-    };
+    (async () => {
+      // instant: show last-known-good manifest from cache
+      const cached = cachedManifest();
+      if (cached && !cancelled) setRemoteSongs(manifestSongs(cached));
+      // then refresh from the server
+      const m = await fetchManifest();
+      if (!cancelled && m) setRemoteSongs(manifestSongs(m));
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   /* --------------------------------- Theme --------------------------------- */

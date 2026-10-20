@@ -63,8 +63,25 @@ export default function PdfReader({
         ).toString();
         if (!alive) return;
         pdfjsRef.current = pdfjs;
+        let docSrc = src;
+        if (/^https?:/i.test(src)) {
+          // remote PDF: cache for offline reading after first open
+          try {
+            const cache = await caches.open('hphc-pdfs');
+            const hit = await cache.match(src);
+            if (hit) {
+              docSrc = URL.createObjectURL(await hit.blob());
+            } else {
+              const res = await fetch(src);
+              if (res.ok) {
+                await cache.put(src, res.clone());
+                docSrc = URL.createObjectURL(await res.blob());
+              }
+            }
+          } catch { /* fall back to direct streaming */ }
+        }
         const d = await pdfjs.getDocument({
-          url: src,
+          url: docSrc,
           standardFontDataUrl: new URL('./pdfjs/standard_fonts/', document.baseURI).toString(),
           useSystemFonts: false,
         }).promise;
