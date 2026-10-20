@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Library, BookOpen, ChevronLeft, ChevronRight, FileText, ListTree, Maximize2, Minimize2, Search, ZoomIn, ZoomOut, RotateCcw, X } from 'lucide-react';
 import exposition from '../data/books/exposition.json';
 import PdfReader from './PdfReader';
-import { FileUp, Feather } from 'lucide-react';
+import { FileUp, Feather, Cloud } from 'lucide-react';
+import { fetchManifest, manifestBooks, cachedManifest, type RemoteBook } from '../remoteContent';
 
 const TAP = { type: 'spring', stiffness: 700, damping: 26 } as const;
 const FAST = { duration: 0.16, ease: [0.2, 0, 0, 1] } as const;
@@ -116,12 +117,13 @@ const snippetAround = (text: string, q: string): SearchHit['snippet'] => {
 /* --------------------------------- Shelf --------------------------------- */
 
 function Shelf({
-  book, onOpen, onOpenPdf, onPickDevicePdf,
+  book, onOpen, onOpenPdf, onPickDevicePdf, remoteBooks,
 }: {
   book: Book | null;
   onOpen: () => void;
-  onOpenPdf: (src: string, title: string, author: string) => void;
+  onOpenPdf: (src: string, title: string, author: string, progressKey?: string) => void;
   onPickDevicePdf: () => void;
+  remoteBooks: RemoteBook[];
 }) {
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -219,6 +221,34 @@ function Shelf({
           </div>
           <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
         </motion.button>
+
+        {remoteBooks.map((rb) => (
+          <motion.button
+            key={rb.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={FAST}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onOpenPdf(rb.url, rb.title, rb.author, `remote:${rb.id}`)}
+            className="w-full text-left rounded-[28px] bg-white dark:bg-night-800 border border-amber-brand/30 hover:border-amber-brand/60 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all p-6 flex items-center gap-5 group"
+          >
+            <div className="flex-shrink-0 w-16 h-20 rounded-2xl bg-ink-900 dark:bg-amoled border border-white/10 flex items-center justify-center shadow-lg group-hover:bg-amber-brand transition-colors">
+              <Cloud className="w-7 h-7 text-amber-brand group-hover:text-black transition-colors" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-extrabold text-ink-900 dark:text-creamtext leading-snug">
+                {rb.title}
+              </h3>
+              <p className="text-xs font-bold text-ink-700 dark:text-muted-warm mt-1.5 uppercase tracking-[0.12em]">
+                {rb.author}
+              </p>
+              <p className="text-xs font-semibold text-ink-700 dark:text-muted-warm mt-2">
+                {rb.note ?? 'PDF'}{rb.pages ? ` · ${rb.pages} pages` : ''}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 flex-shrink-0 text-ember/50 dark:text-amber-brand/50 group-hover:text-ember dark:group-hover:text-amber-brand group-hover:translate-x-0.5 transition-all" />
+          </motion.button>
+        ))}
 
         <motion.button
           initial={{ opacity: 0 }}
@@ -626,9 +656,21 @@ function Reader({ book, onClose }: { book: Book; onClose: () => void }) {
 
 export default function BooksPage() {
   const [reading, setReading] = useState(false);
+  const [remoteBooks, setRemoteBooks] = useState<RemoteBook[]>([]);
   const [pdf, setPdf] = useState<{ src: string; title: string; author: string; progressKey?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const book = useBook();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cached = cachedManifest();
+      if (cached && !cancelled) setRemoteBooks(manifestBooks(cached));
+      const m = await fetchManifest();
+      if (!cancelled && m) setRemoteBooks(manifestBooks(m));
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -653,7 +695,8 @@ export default function BooksPage() {
       <Shelf
         book={book}
         onOpen={() => setReading(true)}
-        onOpenPdf={(src, title, author) => setPdf({ src, title, author })}
+        onOpenPdf={(src, title, author, progressKey) => setPdf({ src, title, author, progressKey })}
+        remoteBooks={remoteBooks}
         onPickDevicePdf={() => fileInputRef.current?.click()}
       />
     </>
