@@ -15,6 +15,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -55,10 +57,29 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** YouTube embed URL - plays inline, and the fullscreen button works. */
-private fun embedUrl(videoId: String): String =
-    "https://www.youtube.com/embed/$videoId" +
-        "?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1"
+/** Origin the embed believes it is running on. YouTube refuses to play (Error 153)
+ *  when an embed has no valid HTTP referrer, so the player page is served from here. */
+private const val EMBED_ORIGIN = "https://hphc-holy-songs.web.app"
+
+/**
+ * A tiny page that holds the official YouTube iframe. It is loaded with an
+ * https base URL so the iframe sends a real Referer/origin, which is what
+ * clears "Video player configuration error 153".
+ */
+private fun playerHtml(videoId: String): String = """
+<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style>html,body{margin:0;height:100%;background:#000}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style>
+</head><body>
+<iframe
+  src="https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&enablejsapi=1&origin=$EMBED_ORIGIN"
+  title="HJ Global News"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+  referrerpolicy="strict-origin-when-cross-origin"
+  allowfullscreen></iframe>
+</body></html>
+"""
 
 /**
  * In-app YouTube player. A WebView running the official embed page: no API
@@ -115,7 +136,13 @@ fun YouTubeScreen(item: NewsItem) {
                             }
                         }
                         webChromeClient = FullscreenChrome(activity)
-                        loadUrl(embedUrl(item.id))
+                        loadDataWithBaseURL(
+                            EMBED_ORIGIN,
+                            playerHtml(item.id),
+                            "text/html",
+                            "utf-8",
+                            null,
+                        )
                         holder[0] = this
                     }
                 },
@@ -218,6 +245,26 @@ fun YouTubeScreen(item: NewsItem) {
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFFF2E7D3),
             )
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                color = Color(0xFFE9B44C),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.clickable {
+                    ctx.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${item.id}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                },
+            ) {
+                Text(
+                    "Open in YouTube",
+                    fontFamily = Ui,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp),
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Surface(
                 color = Color(0xFF141110),
