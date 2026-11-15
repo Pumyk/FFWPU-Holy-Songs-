@@ -5,6 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,15 +24,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Handshake
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Newspaper
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,17 +59,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Section(val label: String, val icon: ImageVector) {
-    Songs("Holy Songs", Icons.Default.Book),
-    Pledge("Family Pledge", Icons.Default.Handshake),
-    Books("Books", Icons.Default.MenuBook),
-    News("HJ Global News", Icons.Default.Newspaper),
+enum class Section(val label: String, val blurb: String, val icon: ImageVector) {
+    Songs("Holy Songs", "42 hymns, searchable", Icons.Default.Book),
+    Pledge("Family Pledge", "Eight pledges", Icons.Default.Handshake),
+    Books("Books", "Full texts, offline", Icons.Default.MenuBook),
+    News("HJ Global News", "Weekly editions", Icons.Default.Newspaper),
 }
 
 sealed interface Route {
@@ -84,15 +95,6 @@ private fun App() {
     val scope = rememberCoroutineScope()
     var route by remember { mutableStateOf<Route>(Route.Home) }
 
-    // System back: song/book -> its section -> home. Only home exits the app.
-    BackHandler(enabled = route !is Route.Home) {
-        route = when (val r = route) {
-            is Route.SongRoute -> Route.SectionRoute(Section.Songs)
-            is Route.BookRoute -> Route.SectionRoute(Section.Books)
-            else -> Route.Home
-        }
-    }
-
     val bundled = remember { Data.bundledSongs(ctx) }
     var remote by remember { mutableStateOf<List<Song>>(emptyList()) }
     val songs = remember(bundled, remote) { Data.mergedSongs(bundled, remote) }
@@ -102,12 +104,13 @@ private fun App() {
     var channel by remember { mutableStateOf(bundledNews.second) }
     var newsRefreshing by remember { mutableStateOf(true) }
 
-    // Remote content: new songs from the manifest appear without an app update.
+    var remoteBooks by remember { mutableStateOf<List<Book>>(emptyList()) }
+    var shelfRefreshing by remember { mutableStateOf(true) }
+
     LaunchedEffect(Unit) {
         val r = withContext(Dispatchers.IO) { Data.remoteSongs() }
         if (r.isNotEmpty()) remote = r
     }
-
     LaunchedEffect(Unit) {
         val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
         if (fresh != null) {
@@ -116,20 +119,38 @@ private fun App() {
         }
         newsRefreshing = false
     }
+    LaunchedEffect(Unit) {
+        remoteBooks = withContext(Dispatchers.IO) { Data.remoteBooks() }
+        shelfRefreshing = false
+    }
+
+    BackHandler(enabled = route !is Route.Home) {
+        route = when (val r = route) {
+            is Route.SongRoute -> Route.SectionRoute(Section.Songs)
+            is Route.BookRoute -> Route.SectionRoute(Section.Books)
+            else -> Route.Home
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
-            ModalDrawerSheet {
-                Column(Modifier.padding(20.dp)) {
-                    Text("HPHC Library", fontSize = 22.sp, fontWeight = FontWeight.Black)
+            // Slide-over panel: 78% width, so the home screen stays visible behind it.
+            ModalDrawerSheet(
+                modifier = Modifier.fillMaxWidth(0.78f),
+                drawerShape = RoundedCornerShape(topEnd = 26.dp, bottomEnd = 26.dp),
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(Modifier.padding(horizontal = 18.dp, vertical = 30.dp)) {
+                    Text("HPHC Library", fontFamily = Lora, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Holy Songs, Pledge, Books, News",
-                        fontSize = 12.sp,
+                        "Holy Songs · Pledge · Books · News",
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 18.dp),
+                        modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
                     )
                     Section.entries.forEach { s ->
+                        val active = (route as? Route.SectionRoute)?.section == s
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -137,13 +158,25 @@ private fun App() {
                                     route = Route.SectionRoute(s)
                                     scope.launch { drawer.close() }
                                 }
-                                .padding(vertical = 12.dp),
+                                .background(
+                                    if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                                    RoundedCornerShape(14.dp),
+                                )
+                                .padding(horizontal = 12.dp, vertical = 13.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(s.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                            Icon(
+                                s.icon, null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
                             Spacer(Modifier.width(14.dp))
-                            Text(s.label, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Column {
+                                Text(s.label, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(s.blurb, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
             }
@@ -155,11 +188,15 @@ private fun App() {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(top = 34.dp, start = 6.dp, end = 12.dp, bottom = 6.dp),
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                            .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val showBack = route !is Route.Home
-                        if (showBack) {
+                        if (route is Route.Home) {
+                            IconButton(onClick = { scope.launch { drawer.open() } }) {
+                                Icon(Icons.Default.Menu, "Open menu")
+                            }
+                        } else {
                             IconButton(onClick = {
                                 route = when (val r = route) {
                                     is Route.SongRoute -> Route.SectionRoute(Section.Songs)
@@ -167,14 +204,17 @@ private fun App() {
                                     else -> Route.Home
                                 }
                             }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                        } else {
-                            IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Default.Menu, "Menu") }
                         }
-                        Spacer(Modifier.width(4.dp))
                         Text(
-                            (route as? Route.SectionRoute)?.section?.label ?: "HPHC Library",
+                            when (val r = route) {
+                                is Route.Home -> "HPHC Library"
+                                is Route.SectionRoute -> r.section.label
+                                is Route.SongRoute -> "Holy Songs"
+                                is Route.BookRoute -> "Books"
+                            },
+                            fontFamily = Lora,
                             fontSize = 17.sp,
-                            fontWeight = FontWeight.Black,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -186,29 +226,38 @@ private fun App() {
                     .padding(padding)
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                when (val r = route) {
-                    is Route.Home -> HomeScreen(
-                        songCount = songs.size,
-                        onPick = { route = Route.SectionRoute(it) },
-                    )
-                    is Route.SectionRoute -> when (r.section) {
-                        Section.Songs -> SongsScreen(songs) { route = Route.SongRoute(it) }
-                        Section.Pledge -> PledgeScreen(pledge)
-                        Section.Books -> BooksScreen { route = Route.BookRoute(it) }
-                        Section.News -> NewsScreen(news, channel, newsRefreshing) {
-                            scope.launch {
-                                newsRefreshing = true
-                                val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
-                                if (fresh != null) {
-                                    news = fresh.first
-                                    channel = fresh.second
+                AnimatedContent(
+                    targetState = route,
+                    transitionSpec = {
+                        (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 14 })
+                            .togetherWith(fadeOut(tween(90)))
+                    },
+                    label = "route",
+                ) { r ->
+                    when (r) {
+                        is Route.Home -> HomeScreen(
+                            songCount = songs.size,
+                            onPick = { route = Route.SectionRoute(it) },
+                        )
+                        is Route.SectionRoute -> when (r.section) {
+                            Section.Songs -> SongsScreen(songs) { route = Route.SongRoute(it) }
+                            Section.Pledge -> PledgeScreen(pledge)
+                            Section.Books -> BooksScreen(remoteBooks, shelfRefreshing) { route = Route.BookRoute(it) }
+                            Section.News -> NewsScreen(news, channel, newsRefreshing) {
+                                scope.launch {
+                                    newsRefreshing = true
+                                    val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
+                                    if (fresh != null) {
+                                        news = fresh.first
+                                        channel = fresh.second
+                                    }
+                                    newsRefreshing = false
                                 }
-                                newsRefreshing = false
                             }
                         }
+                        is Route.SongRoute -> SongDetailScreen(r.song)
+                        is Route.BookRoute -> PdfBookScreen(r.book)
                     }
-                    is Route.SongRoute -> SongDetailScreen(r.song) { route = Route.SectionRoute(Section.Songs) }
-                    is Route.BookRoute -> PdfBookScreen(r.book) { route = Route.SectionRoute(Section.Books) }
                 }
             }
         }
@@ -217,34 +266,65 @@ private fun App() {
 
 @Composable
 private fun HomeScreen(songCount: Int, onPick: (Section) -> Unit) {
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-        Text("Welcome", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("HPHC Library", fontSize = 34.sp, fontWeight = FontWeight.Black)
+    Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
         Text(
-            "$songCount songs ready",
-            fontSize = 14.sp,
+            "Welcome back",
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
+            letterSpacing = 1.6.sp,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
+        )
+        Text("HPHC Library", fontFamily = Lora, fontSize = 38.sp, fontWeight = FontWeight.Bold, lineHeight = 42.sp)
+        Text(
+            "$songCount songs · offline ready",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
         )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Section.entries.forEach { s ->
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(18.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPick(s) },
                 ) {
-                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(s.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Text(s.label, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
-                        Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = CircleShape,
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(s.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(s.label, fontFamily = Lora, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            Text(s.blurb, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
             }
         }
+        Text(
+            "HPHC · Holy Songs & texts",
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 22.dp),
+        )
     }
 }

@@ -45,7 +45,7 @@ fun NewsScreen(items: List<NewsItem>, channel: String, refreshing: Boolean, onRe
     val ctx = LocalContext.current
     LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Text("HJ Global News", fontSize = 30.sp, fontWeight = FontWeight.Black)
+            Text("HJ Global News", fontFamily = Lora, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(
                 if (refreshing) "Refreshing…" else "Latest English editions · $channel",
                 color = MaterialTheme.colorScheme.primary,
