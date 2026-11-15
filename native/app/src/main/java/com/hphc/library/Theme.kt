@@ -7,6 +7,11 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+
+// Lora: warm serif for titles and lyrics (bundled, res/font/lora.ttf)
+val Lora = FontFamily(Font(R.font.lora))
 
 // AMOLED black + mustard / orange / cream (Mfoniso's palette)
 val Amoled = Color(0xFF000000)
