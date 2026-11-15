@@ -11,31 +11,34 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Handshake
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Newspaper
@@ -45,6 +48,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,6 +123,14 @@ private fun App(
     var route by remember { mutableStateOf<Route>(Route.Home) }
     var favorites by remember { mutableStateOf(prefs.favorites) }
     var lyricZoom by remember { mutableFloatStateOf(prefs.lyricZoom) }
+    var keepAwake by remember { mutableStateOf(prefs.keepAwake) }
+    var autoSpeed by remember { mutableIntStateOf(prefs.autoScrollSpeed) }
+    var hideChorus by remember { mutableStateOf(prefs.hideChorus) }
+    var pledgeSans by remember { mutableStateOf(prefs.pledgeSans) }
+    var recents by remember { mutableStateOf(prefs.recents()) }
+    var playlists by remember { mutableStateOf(prefs.playlists()) }
+    var watched by remember { mutableStateOf(prefs.watchedNews) }
+    var wideSong by remember { mutableStateOf<Song?>(null) }
 
     val bundled = remember { Data.bundledSongs(ctx) }
     var remote by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -147,201 +161,474 @@ private fun App(
         shelfRefreshing = false
     }
 
-    BackHandler(enabled = route !is Route.Home) {
-        route = when (val r = route) {
-            is Route.SongRoute -> Route.SectionRoute(Section.Songs)
-            is Route.BookRoute -> Route.SectionRoute(Section.Books)
-            is Route.VideoRoute -> Route.SectionRoute(Section.News)
-            else -> Route.Home
-        }
-    }
+    BoxWithConstraints {
+        val wide = maxWidth >= 720.dp
 
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        drawerContent = {
-            // Slide-over panel: 78% width, so the home screen stays visible behind it.
-            ModalDrawerSheet(
-                modifier = Modifier.fillMaxWidth(0.78f),
-                drawerShape = RoundedCornerShape(topEnd = 26.dp, bottomEnd = 26.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-            ) {
-                Column(Modifier.padding(horizontal = 18.dp, vertical = 30.dp)) {
-                    Text("HPHC Library", fontFamily = Lora, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Holy Songs · Pledge · Books · News",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
-                    )
-                    Section.entries.forEach { s ->
-                        val active = (route as? Route.SectionRoute)?.section == s
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    route = Route.SectionRoute(s)
-                                    scope.launch { drawer.close() }
-                                }
-                                .background(
-                                    if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                                    RoundedCornerShape(14.dp),
-                                )
-                                .padding(horizontal = 12.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                s.icon, null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(Modifier.width(14.dp))
-                            Column {
-                                Text(s.label, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                                Text(s.blurb, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                    }
-                    Spacer(Modifier.height(26.dp))
-                    Text(
-                        "APPEARANCE",
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(9.dp))
-                    // Two rows of two: four pills do not fit one row in a 78% drawer.
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            ThemePill(ThemeMode.System.label, themeMode == ThemeMode.System) {
-                                onThemeMode(ThemeMode.System)
-                            }
-                            ThemePill(ThemeMode.Light.label, themeMode == ThemeMode.Light) {
-                                onThemeMode(ThemeMode.Light)
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            ThemePill(ThemeMode.Dark.label, themeMode == ThemeMode.Dark) {
-                                onThemeMode(ThemeMode.Dark)
-                            }
-                            ThemePill(ThemeMode.Amoled.label, themeMode == ThemeMode.Amoled) {
-                                onThemeMode(ThemeMode.Amoled)
-                            }
-                        }
-                    }
-                }
+        /** Opens a song: remembers it and routes to it (or the wide side pane). */
+        val choose: (Song) -> Unit = { song ->
+            prefs.pushRecent(song.id)
+            recents = prefs.recents()
+            if (wide) wideSong = song else route = Route.SongRoute(song)
+        }
+
+        BackHandler(enabled = route !is Route.Home) {
+            route = when (val r = route) {
+                is Route.SongRoute -> Route.SectionRoute(Section.Songs)
+                is Route.BookRoute -> Route.SectionRoute(Section.Books)
+                is Route.VideoRoute -> Route.SectionRoute(Section.News)
+                else -> Route.Home
             }
-        },
-    ) {
-        Scaffold(
-            topBar = {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.statusBars)
-                            .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (route is Route.Home) {
-                            IconButton(onClick = { scope.launch { drawer.open() } }) {
-                                Icon(Icons.Default.Menu, "Open menu")
-                            }
-                        } else {
-                            IconButton(onClick = {
-                                route = when (val r = route) {
-                                    is Route.SongRoute -> Route.SectionRoute(Section.Songs)
-                                    is Route.BookRoute -> Route.SectionRoute(Section.Books)
-                                    is Route.VideoRoute -> Route.SectionRoute(Section.News)
-                                    else -> Route.Home
-                                }
-                            }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                        }
+        }
+
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            gesturesEnabled = !wide,
+            drawerContent = {
+                // Slide-over panel: 78% width, so the home screen stays visible behind it.
+                ModalDrawerSheet(
+                    modifier = Modifier.fillMaxWidth(0.78f),
+                    drawerShape = RoundedCornerShape(topEnd = 26.dp, bottomEnd = 26.dp),
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                ) {
+                    Column(Modifier.padding(horizontal = 18.dp, vertical = 30.dp)) {
+                        Text("HPHC Library", fontFamily = Lora, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            when (val r = route) {
-                                is Route.Home -> "HPHC Library"
-                                is Route.SectionRoute -> r.section.label
-                                is Route.SongRoute -> "Holy Songs"
-                                is Route.BookRoute -> "Books"
-                                is Route.VideoRoute -> "HJ Global News"
-                            },
-                            fontFamily = Lora,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
+                            "Holy Songs · Pledge · Books · News",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 22.dp),
                         )
+                        Section.entries.forEach { s ->
+                            val active = (route as? Route.SectionRoute)?.section == s
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        route = Route.SectionRoute(s)
+                                        scope.launch { drawer.close() }
+                                    }
+                                    .background(
+                                        if (active) {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        },
+                                        RoundedCornerShape(14.dp),
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    s.icon, null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Spacer(Modifier.width(14.dp))
+                                Column {
+                                    Text(s.label, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        s.blurb,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                        Spacer(Modifier.height(26.dp))
+                        Text(
+                            "APPEARANCE",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.4.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(9.dp))
+                        // Two rows of two: four pills do not fit one row in a 78% drawer.
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                ThemePill(ThemeMode.System.label, themeMode == ThemeMode.System) {
+                                    onThemeMode(ThemeMode.System)
+                                }
+                                ThemePill(ThemeMode.Light.label, themeMode == ThemeMode.Light) {
+                                    onThemeMode(ThemeMode.Light)
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                ThemePill(ThemeMode.Dark.label, themeMode == ThemeMode.Dark) {
+                                    onThemeMode(ThemeMode.Dark)
+                                }
+                                ThemePill(ThemeMode.Amoled.label, themeMode == ThemeMode.Amoled) {
+                                    onThemeMode(ThemeMode.Amoled)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            "READING",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.4.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(9.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ThemePill("Screen on", keepAwake) {
+                                keepAwake = !keepAwake
+                                prefs.keepAwake = keepAwake
+                            }
+                            ThemePill(
+                                if (autoSpeed == 0) "Auto-scroll off" else "Auto ×$autoSpeed",
+                                autoSpeed > 0,
+                            ) {
+                                autoSpeed = if (autoSpeed == 0) 4 else 0
+                                prefs.autoScrollSpeed = autoSpeed
+                            }
+                        }
                     }
                 }
             },
-        ) { padding ->
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(MaterialTheme.colorScheme.background),
-            ) {
-                AnimatedContent(
-                    targetState = route,
-                    transitionSpec = {
-                        (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 14 })
-                            .togetherWith(fadeOut(tween(90)))
-                    },
-                    label = "route",
-                ) { r ->
-                    when (r) {
-                        is Route.Home -> HomeScreen(
-                            onPick = { route = Route.SectionRoute(it) },
+        ) {
+            Row(Modifier.fillMaxSize()) {
+                if (wide) {
+                    NavigationRail(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        header = {
+                            IconButton(onClick = { route = Route.Home }) {
+                                Text(
+                                    "H",
+                                    fontFamily = Lora,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        },
+                    ) {
+                        Spacer(Modifier.height(6.dp))
+                        NavigationRailItem(
+                            selected = route is Route.Home,
+                            onClick = { route = Route.Home },
+                            icon = { Icon(Icons.Default.Home, "Home") },
+                            label = { Text("Home", fontSize = 9.sp) },
                         )
-                        is Route.SectionRoute -> when (r.section) {
-                            Section.Songs -> SongsScreen(
-                                songs = songs,
-                                favorites = favorites,
-                                onToggleFavorite = { favorites = prefs.toggleFavorite(it) },
-                            ) { route = Route.SongRoute(it) }
-                            Section.Pledge -> PledgeScreen(
-                                verses = pledge,
-                                zoom = lyricZoom,
-                                onZoom = {
-                                    lyricZoom = it
-                                    prefs.lyricZoom = it
+                        Section.entries.forEach { s ->
+                            NavigationRailItem(
+                                selected = (route as? Route.SectionRoute)?.section == s,
+                                onClick = { route = Route.SectionRoute(s) },
+                                icon = { Icon(s.icon, s.label) },
+                                label = {
+                                    Text(
+                                        s.label.substringBefore(' '),
+                                        fontSize = 9.sp,
+                                        textAlign = TextAlign.Center,
+                                    )
                                 },
-                            )
-                            Section.Books -> BooksScreen(remoteBooks, shelfRefreshing) { route = Route.BookRoute(it) }
-                            Section.News -> NewsScreen(
-                                items = news,
-                                channel = channel,
-                                refreshing = newsRefreshing,
-                                onRefresh = {
-                                    scope.launch {
-                                        newsRefreshing = true
-                                        val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
-                                        if (fresh != null) {
-                                            news = fresh.first
-                                            channel = fresh.second
-                                        }
-                                        newsRefreshing = false
-                                    }
-                                },
-                                onPlay = { route = Route.VideoRoute(it) },
                             )
                         }
-                        is Route.SongRoute -> SongDetailScreen(
-                            song = r.song,
-                            isFavorite = favorites.contains(r.song.id),
-                            onToggleFavorite = { favorites = prefs.toggleFavorite(r.song.id) },
-                            zoom = lyricZoom,
-                            onZoom = {
-                                lyricZoom = it
-                                prefs.lyricZoom = it
+                    }
+                }
+                Scaffold(
+                    modifier = Modifier.weight(1f),
+                    topBar = {
+                        Surface(color = MaterialTheme.colorScheme.background) {
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.statusBars)
+                                    .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (route is Route.Home && !wide) {
+                                    IconButton(onClick = { scope.launch { drawer.open() } }) {
+                                        Icon(Icons.Default.Menu, "Open menu")
+                                    }
+                                } else if (route !is Route.Home) {
+                                    IconButton(onClick = {
+                                        route = when (val r = route) {
+                                            is Route.SongRoute -> Route.SectionRoute(Section.Songs)
+                                            is Route.BookRoute -> Route.SectionRoute(Section.Books)
+                                            is Route.VideoRoute -> Route.SectionRoute(Section.News)
+                                            else -> Route.Home
+                                        }
+                                    }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                                } else {
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Text(
+                                    when (val r = route) {
+                                        is Route.Home -> "HPHC Library"
+                                        is Route.SectionRoute -> r.section.label
+                                        is Route.SongRoute -> "Holy Songs"
+                                        is Route.BookRoute -> "Books"
+                                        is Route.VideoRoute -> "HJ Global News"
+                                    },
+                                    fontFamily = Lora,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                    },
+                ) { padding ->
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .background(MaterialTheme.colorScheme.background),
+                    ) {
+                        AnimatedContent(
+                            targetState = route,
+                            transitionSpec = {
+                                (fadeIn(tween(170)) + slideInHorizontally(tween(170)) { it / 14 })
+                                    .togetherWith(fadeOut(tween(90)))
                             },
-                        )
-                        is Route.BookRoute -> PdfBookScreen(r.book)
-                        is Route.VideoRoute -> YouTubeScreen(r.item)
+                            label = "route",
+                        ) { r ->
+                            when (r) {
+                                is Route.Home -> HomeScreen(
+                                    onPick = { route = Route.SectionRoute(it) },
+                                )
+                                is Route.SectionRoute -> when (r.section) {
+                                    Section.Songs -> {
+                                        val list: @Composable (Modifier) -> Unit = { m ->
+                                            SongsScreen(
+                                                songs = songs,
+                                                favorites = favorites,
+                                                recentIds = recents,
+                                                playlists = playlists,
+                                                onToggleFavorite = { favorites = prefs.toggleFavorite(it) },
+                                                onOpen = choose,
+                                                onRemoveFromSet = { name, id ->
+                                                    prefs.removeFromPlaylist(name, id)
+                                                    playlists = prefs.playlists()
+                                                },
+                                                selectedId = if (wide) wideSong?.id else null,
+                                                modifier = m,
+                                            )
+                                        }
+                                        if (wide) {
+                                            Row(Modifier.fillMaxSize()) {
+                                                list(Modifier.weight(0.44f))
+                                                Box(Modifier.weight(0.56f)) {
+                                                    val song = wideSong
+                                                    if (song == null) {
+                                                        Box(
+                                                            Modifier
+                                                                .fillMaxSize()
+                                                                .padding(30.dp),
+                                                            contentAlignment = Alignment.Center,
+                                                        ) {
+                                                            Text(
+                                                                "Pick a hymn to read it here.",
+                                                                fontFamily = Lora,
+                                                                fontSize = 15.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                textAlign = TextAlign.Center,
+                                                            )
+                                                        }
+                                                    } else {
+                                                        SongPage(
+                                                            song = song,
+                                                            songs = songs,
+                                                            isFavorite = favorites.contains(song.id),
+                                                            onToggleFavorite = {
+                                                                favorites = prefs.toggleFavorite(song.id)
+                                                            },
+                                                            zoom = lyricZoom,
+                                                            onZoom = {
+                                                                lyricZoom = it
+                                                                prefs.lyricZoom = it
+                                                            },
+                                                            hideChorus = hideChorus,
+                                                            onToggleChorus = {
+                                                                hideChorus = !hideChorus
+                                                                prefs.hideChorus = hideChorus
+                                                            },
+                                                            keepAwake = keepAwake,
+                                                            onToggleKeepAwake = {
+                                                                keepAwake = !keepAwake
+                                                                prefs.keepAwake = keepAwake
+                                                            },
+                                                            autoSpeed = autoSpeed,
+                                                            onAutoSpeed = {
+                                                                autoSpeed = it
+                                                                prefs.autoScrollSpeed = it
+                                                            },
+                                                            playlists = playlists,
+                                                            onAddToSet = { name, id ->
+                                                                prefs.addToPlaylist(name, id)
+                                                                playlists = prefs.playlists()
+                                                            },
+                                                            onCreateSet = { name, id ->
+                                                                prefs.createPlaylist(name)
+                                                                prefs.addToPlaylist(name.trim(), id)
+                                                                playlists = prefs.playlists()
+                                                            },
+                                                            onOpenSong = choose,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            list(Modifier)
+                                        }
+                                    }
+                                    Section.Pledge -> PledgeScreen(
+                                        verses = pledge,
+                                        zoom = lyricZoom,
+                                        onZoom = {
+                                            lyricZoom = it
+                                            prefs.lyricZoom = it
+                                        },
+                                        sans = pledgeSans,
+                                        onSans = {
+                                            pledgeSans = it
+                                            prefs.pledgeSans = it
+                                        },
+                                        keepAwake = keepAwake,
+                                        onToggleKeepAwake = {
+                                            keepAwake = !keepAwake
+                                            prefs.keepAwake = keepAwake
+                                        },
+                                        autoSpeed = autoSpeed,
+                                        onAutoSpeed = {
+                                            autoSpeed = it
+                                            prefs.autoScrollSpeed = it
+                                        },
+                                    )
+                                    Section.Books -> BooksScreen(
+                                        remoteBooks = remoteBooks,
+                                        refreshing = shelfRefreshing,
+                                        prefs = prefs,
+                                        onOpen = { route = Route.BookRoute(it) },
+                                    )
+                                    Section.News -> NewsScreen(
+                                        items = news,
+                                        channel = channel,
+                                        refreshing = newsRefreshing,
+                                        watched = watched,
+                                        onRefresh = {
+                                            scope.launch {
+                                                newsRefreshing = true
+                                                val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
+                                                if (fresh != null) {
+                                                    news = fresh.first
+                                                    channel = fresh.second
+                                                }
+                                                newsRefreshing = false
+                                            }
+                                        },
+                                        onPlay = {
+                                            prefs.markWatched(it.id)
+                                            watched = prefs.watchedNews
+                                            route = Route.VideoRoute(it)
+                                        },
+                                    )
+                                }
+                                is Route.SongRoute -> SongPage(
+                                    song = r.song,
+                                    songs = songs,
+                                    isFavorite = favorites.contains(r.song.id),
+                                    onToggleFavorite = {
+                                        favorites = prefs.toggleFavorite(r.song.id)
+                                    },
+                                    zoom = lyricZoom,
+                                    onZoom = {
+                                        lyricZoom = it
+                                        prefs.lyricZoom = it
+                                    },
+                                    hideChorus = hideChorus,
+                                    onToggleChorus = {
+                                        hideChorus = !hideChorus
+                                        prefs.hideChorus = hideChorus
+                                    },
+                                    keepAwake = keepAwake,
+                                    onToggleKeepAwake = {
+                                        keepAwake = !keepAwake
+                                        prefs.keepAwake = keepAwake
+                                    },
+                                    autoSpeed = autoSpeed,
+                                    onAutoSpeed = {
+                                        autoSpeed = it
+                                        prefs.autoScrollSpeed = it
+                                    },
+                                    playlists = playlists,
+                                    onAddToSet = { name, id ->
+                                        prefs.addToPlaylist(name, id)
+                                        playlists = prefs.playlists()
+                                    },
+                                    onCreateSet = { name, id ->
+                                        prefs.createPlaylist(name)
+                                        prefs.addToPlaylist(name.trim(), id)
+                                        playlists = prefs.playlists()
+                                    },
+                                    onOpenSong = choose,
+                                )
+                                is Route.BookRoute -> if (r.book.structured) {
+                                    ExpositionScreen(r.book)
+                                } else {
+                                    PdfBookScreen(r.book, prefs)
+                                }
+                                is Route.VideoRoute -> YouTubeScreen(r.item)
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * One song page, wired for whichever list it was opened from: position and
+ * prev/next come from the current song list, so stepping through the hymn
+ * book works from the normal list and the wide side pane alike.
+ */
+@Composable
+private fun SongPage(
+    song: Song,
+    songs: List<Song>,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    zoom: Float,
+    onZoom: (Float) -> Unit,
+    hideChorus: Boolean,
+    onToggleChorus: () -> Unit,
+    keepAwake: Boolean,
+    onToggleKeepAwake: () -> Unit,
+    autoSpeed: Int,
+    onAutoSpeed: (Int) -> Unit,
+    playlists: Map<String, Set<String>>,
+    onAddToSet: (String, String) -> Unit,
+    onCreateSet: (String, String) -> Unit,
+    onOpenSong: (Song) -> Unit,
+) {
+    val index = songs.indexOfFirst { it.id == song.id }
+    SongDetailScreen(
+        song = song,
+        position = if (index >= 0) index else 0,
+        total = songs.size,
+        isFavorite = isFavorite,
+        onToggleFavorite = onToggleFavorite,
+        zoom = zoom,
+        onZoom = onZoom,
+        hideChorus = hideChorus,
+        onToggleChorus = onToggleChorus,
+        keepAwake = keepAwake,
+        onToggleKeepAwake = onToggleKeepAwake,
+        autoSpeed = autoSpeed,
+        onAutoSpeed = onAutoSpeed,
+        playlists = playlists,
+        onAddToSet = onAddToSet,
+        onCreateSet = onCreateSet,
+        onPrev = if (index > 0) {
+            { onOpenSong(songs[index - 1]) }
+        } else null,
+        onNext = if (index in 0 until songs.size - 1) {
+            { onOpenSong(songs[index + 1]) }
+        } else null,
+    )
 }
 
 @Composable
@@ -373,9 +660,7 @@ private fun HomeScreen(onPick: (Section) -> Unit) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(18.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPick(s) },
@@ -387,7 +672,11 @@ private fun HomeScreen(onPick: (Section) -> Unit) {
                             modifier = Modifier.size(42.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Icon(s.icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
+                                Icon(
+                                    s.icon, null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(21.dp),
+                                )
                             }
                         }
                         Spacer(Modifier.width(14.dp))

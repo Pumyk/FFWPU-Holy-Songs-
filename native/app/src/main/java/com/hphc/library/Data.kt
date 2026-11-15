@@ -27,8 +27,12 @@ data class Book(
     val note: String,
     val asset: String? = null,
     val remoteUrl: String? = null,
+    val textAsset: String? = null,
 ) {
     val remote: Boolean get() = remoteUrl != null
+
+    /** True for books that open as a structured chapter reader, not a PDF. */
+    val structured: Boolean get() = textAsset != null
 }
 
 data class NewsItem(val title: String, val id: String, val date: String, val views: Long)
@@ -129,6 +133,13 @@ object Data {
             note = "Selected passages · 315 pages",
             asset = "books/way-of-tradition-vol1.pdf",
         ),
+        Book(
+            id = "exposition",
+            title = "Exposition of the Divine Principle",
+            author = "Hyo Won Eu",
+            note = "17 chapters · searchable text",
+            textAsset = "books/exposition.json",
+        ),
     )
 
     /** Extra PDF books published in content/manifest.json (downloaded on first open). */
@@ -199,6 +210,42 @@ object Data {
 
     fun youtubeUrl(videoId: String) = "https://www.youtube.com/watch?v=$videoId"
 
+    /** True when the device currently has a usable internet connection. */
+    fun isOnline(ctx: Context): Boolean {
+        val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+        val net = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(net) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /**
+     * Cached thumbnail for a news edition. Fetched once while online, then
+     * reused so an offline tap still shows a recognisable cover.
+     */
+    fun thumbFile(ctx: Context, videoId: String): File? {
+        if (videoId.isBlank()) return null
+        val dir = File(ctx.filesDir, "thumbs").apply { mkdirs() }
+        val out = File(dir, "$videoId.jpg")
+        if (out.exists() && out.length() > 0) return out
+        if (!isOnline(ctx)) return null
+        return try {
+            val conn = URL("https://i.ytimg.com/vi/$videoId/hqdefault.jpg")
+                .openConnection() as HttpURLConnection
+            conn.connectTimeout = 6000
+            conn.readTimeout = 10000
+            conn.setRequestProperty("User-Agent", "HPHCLibrary")
+            try {
+                if (conn.responseCode != 200) return null
+                conn.inputStream.use { input -> out.outputStream().use { input.copyTo(it) } }
+                out.takeIf { it.length() > 0 }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun bundledNews(ctx: Context): Pair<List<NewsItem>, String> = parseNews(readAsset(ctx, "news.json"))
 
     fun remoteNews(): Pair<List<NewsItem>, String>? {
@@ -229,4 +276,52 @@ object Data {
         }
         return items to channel
     }
+
+    /** Structured, searchable text book (currently the Divine Principle). */
+    fun structuredBook(ctx: Context, asset: String): StructuredBook? = try {
+        val root = JSONObject(readAsset(ctx, asset))
+        val chapters = root.optJSONArray("chapters") ?: JSONArray()
+        val list = buildList {
+            for (i in 0 until chapters.length()) {
+                val c = chapters.optJSONObject(i) ?: continue
+                val blocks = c.optJSONArray("blocks") ?: JSONArray()
+                add(
+                    Chapter(
+                        id = c.optString("id", "ch-$i"),
+                        title = c.optString("title", "Chapter ${i + 1}"),
+                        blocks = buildList {
+                            for (j in 0 until blocks.length()) {
+                                val b = blocks.optJSONObject(j) ?: continue
+                                val text = b.optString("text").trim()
+                                if (text.isNotEmpty()) {
+                                    add(DocBlock(b.optString("type", "p"), text))
+                                }
+                            }
+                        },
+                    )
+                )
+            }
+        }
+        StructuredBook(
+            title = root.optString("title", "Exposition of the Divine Principle"),
+            author = root.optString("author", ""),
+            source = root.optString("source", ""),
+            chapters = list,
+        )
+    } catch (e: Exception) {
+        null
+    }
 }
+
+data class DocBlock(val type: String, val text: String)
+
+data class Chapter(val id: String, val title: String, val blocks: List<DocBlock>) {
+    val wordCount: Int get() = blocks.sumOf { it.text.split(' ').size }
+}
+
+data class StructuredBook(
+    val title: String,
+    val author: String,
+    val source: String,
+    val chapters: List<Chapter>,
+)
