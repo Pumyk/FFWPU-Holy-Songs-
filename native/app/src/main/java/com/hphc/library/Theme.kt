@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.sp
 
 val Lora = FontFamily(Font(R.font.lora))
 
+/** The face the app reads in by default. Serif, everywhere, unless a screen offers otherwise. */
+val Ui = Lora
+
 val Inter = FontFamily(
     Font(R.font.inter, FontWeight.Normal),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
@@ -124,34 +127,34 @@ private val AppTypography = Typography(
         letterSpacing = (-0.1).sp,
     ),
     bodyLarge = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontSize = 15.sp,
         lineHeight = 22.sp,
     ),
     bodyMedium = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontSize = 13.sp,
         lineHeight = 19.sp,
     ),
     bodySmall = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontSize = 11.5.sp,
         lineHeight = 16.sp,
     ),
     labelLarge = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontWeight = FontWeight.SemiBold,
         fontSize = 13.sp,
         letterSpacing = 0.1.sp,
     ),
     labelMedium = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontWeight = FontWeight.SemiBold,
         fontSize = 11.sp,
         letterSpacing = 0.3.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = Inter,
+        fontFamily = Lora,
         fontWeight = FontWeight.SemiBold,
         fontSize = 9.5.sp,
         letterSpacing = 1.4.sp,
@@ -197,7 +200,7 @@ fun ThemePill(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            fontFamily = Inter,
+            fontFamily = Lora,
             fontSize = 10.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,

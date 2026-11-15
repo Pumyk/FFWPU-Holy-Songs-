@@ -126,7 +126,7 @@ private fun ChapterList(
             if (book.author.isNotBlank()) {
                 Text(
                     book.author,
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 11.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp),
@@ -134,7 +134,7 @@ private fun ChapterList(
             }
             Text(
                 "${book.chapters.size} chapters · offline",
-                fontFamily = Inter,
+                fontFamily = Ui,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
@@ -180,7 +180,7 @@ private fun ChapterList(
             if (query.length >= 2) {
                 Text(
                     "${hits.sumOf { it.mentions }} matches in ${hits.size} chapters",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -209,7 +209,7 @@ private fun ChapterList(
                         )
                         Text(
                             hit.preview,
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 11.5.sp,
                             lineHeight = 16.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -237,7 +237,7 @@ private fun ChapterList(
                         )
                         Text(
                             "${ch.blocks.size} passages",
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 10.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 1.dp),
@@ -287,7 +287,7 @@ private fun ChapterReader(chapter: Chapter, book: StructuredBook, modifier: Modi
         Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
             Text(
                 book.title.uppercase(),
-                fontFamily = Inter,
+                fontFamily = Ui,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,

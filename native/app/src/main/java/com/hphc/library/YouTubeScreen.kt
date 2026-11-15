@@ -151,7 +151,7 @@ fun YouTubeScreen(item: NewsItem) {
                     Spacer(Modifier.height(7.dp))
                     Text(
                         if (online) "This edition can't load right now" else "You're offline",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFF2E7D3),
@@ -164,7 +164,7 @@ fun YouTubeScreen(item: NewsItem) {
                             "Every song, book and pledge still works offline. " +
                                 "News editions need a connection."
                         },
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 11.sp,
                         color = Color(0xFFB3A491),
                         modifier = Modifier.padding(horizontal = 26.dp),
@@ -178,7 +178,7 @@ fun YouTubeScreen(item: NewsItem) {
                     ) {
                         Text(
                             "Retry",
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black,
@@ -203,7 +203,7 @@ fun YouTubeScreen(item: NewsItem) {
         ) {
             Text(
                 "LATEST EDITION",
-                fontFamily = Inter,
+                fontFamily = Ui,
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
@@ -227,7 +227,7 @@ fun YouTubeScreen(item: NewsItem) {
                 Column(Modifier.padding(14.dp)) {
                     Text(
                         if (playable) "Playing in the app" else "Saved for later",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFE9B44C),
@@ -240,7 +240,7 @@ fun YouTubeScreen(item: NewsItem) {
                             "The cover for this edition stays on the phone. Open it again " +
                                 "when you have a connection and it plays in the app."
                         },
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                         color = Color(0xFFB3A491),

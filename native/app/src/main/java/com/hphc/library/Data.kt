@@ -19,6 +19,18 @@ data class Song(
 
 data class PledgeVerse(val number: String, val text: String)
 
+/**
+ * Hymn book order: numbered hymns first (21a, 21b sit together under 21),
+ * then anything without a number, such as the anthem.
+ */
+fun orderedSongs(songs: List<Song>): List<Song> {
+    fun rank(song: Song): Int =
+        song.number?.takeWhile { it.isDigit() }?.toIntOrNull() ?: Int.MAX_VALUE
+    return songs.sortedWith(
+        compareBy<Song> { rank(it) }.thenBy { it.number ?: "~" }.thenBy { it.title }
+    )
+}
+
 /** A book on the shelf: bundled (asset != null) or remote (remoteUrl != null). */
 data class Book(
     val id: String,
