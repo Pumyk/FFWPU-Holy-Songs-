@@ -48,7 +48,7 @@ fun AidChip(label: String, active: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            fontFamily = Inter,
+            fontFamily = Ui,
             fontSize = 10.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,

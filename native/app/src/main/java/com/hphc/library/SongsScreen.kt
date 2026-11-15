@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -105,6 +107,7 @@ fun SongsScreen(
             else -> searched
         }
     }
+    val hymnCount = remember(songs) { songs.count { it.number != null } }
     val recents = remember(recentIds, songs) {
         recentIds.mapNotNull { id -> songs.firstOrNull { it.id == id } }
     }
@@ -133,9 +136,9 @@ fun SongsScreen(
                 when {
                     setIds != null -> "${filtered.size} in $setName"
                     filter == FAVORITES -> "${favorites.size} saved"
-                    else -> "${songs.size} songs ready"
+                    else -> "$hymnCount hymns · offline"
                 },
-                fontFamily = Inter,
+                fontFamily = Ui,
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -155,7 +158,7 @@ fun SongsScreen(
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             "#",
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimary,
@@ -168,7 +171,7 @@ fun SongsScreen(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilterPill("All ${songs.size}", selected = filter == ALL) { filter = ALL }
+                FilterPill("All $hymnCount", selected = filter == ALL) { filter = ALL }
                 FilterPill("Favorites ${favorites.size}", selected = filter == FAVORITES) {
                     filter = FAVORITES
                 }
@@ -189,7 +192,7 @@ fun SongsScreen(
             ) {
                 Text(
                     "RECENTLY OPENED",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.3.sp,
@@ -216,7 +219,7 @@ fun SongsScreen(
                             if (song.number != null) {
                                 Text(
                                     "#${song.number}",
-                                    fontFamily = Inter,
+                                    fontFamily = Ui,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -225,7 +228,7 @@ fun SongsScreen(
                             }
                             Text(
                                 song.title,
-                                fontFamily = Inter,
+                                fontFamily = Ui,
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
@@ -250,87 +253,133 @@ fun SongsScreen(
                 modifier = Modifier.padding(20.dp),
             )
         }
+        val numbered = filtered.filter { it.number != null }
+        val extras = filtered.filter { it.number == null }
+        val showAnthemLabel = extras.isNotEmpty() && filter == ALL && query.isBlank()
         LazyColumn(contentPadding = PaddingValues(bottom = 30.dp)) {
-            items(filtered, key = { it.id }) { song ->
-                val starred = favorites.contains(song.id)
-                val current = song.id == selectedId
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpen(song) }
-                        .background(
-                            if (current) MaterialTheme.colorScheme.surfaceVariant else
-                                MaterialTheme.colorScheme.background,
-                        )
-                        .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (song.number != null) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(7.dp),
-                        ) {
-                            Text(
-                                song.number,
-                                fontFamily = Inter,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            song.title,
-                            fontFamily = Lora,
-                            fontSize = 17.5.sp,
-                            lineHeight = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = (-0.2).sp,
-                        )
-                        if (song.artist != null) {
-                            Text(
-                                song.artist,
-                                fontFamily = Inter,
-                                fontSize = 11.5.sp,
-                                letterSpacing = 0.2.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 1.dp),
-                            )
-                        }
-                    }
-                    if (setName != null) {
-                        IconButton(onClick = { onRemoveFromSet(setName, song.id) }) {
-                            Icon(
-                                Icons.Default.Close,
-                                "Remove from $setName",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                modifier = Modifier.size(15.dp),
-                            )
-                        }
-                    }
-                    IconButton(onClick = { onToggleFavorite(song.id) }) {
-                        Icon(
-                            if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            if (starred) "Remove from favorites" else "Add to favorites",
-                            tint = if (starred) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            },
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
+            items(numbered, key = { it.id }) { song ->
+                SongRow(
+                    song = song,
+                    starred = favorites.contains(song.id),
+                    current = song.id == selectedId,
+                    setName = setName,
+                    onRemoveFromSet = onRemoveFromSet,
+                    onToggleFavorite = onToggleFavorite,
+                    onOpen = onOpen,
+                )
+            }
+            if (showAnthemLabel) {
+                item {
+                    Text(
+                        "ANTHEM",
+                        fontFamily = Ui,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp),
+                    )
                 }
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+            }
+            items(extras, key = { it.id }) { song ->
+                SongRow(
+                    song = song,
+                    starred = favorites.contains(song.id),
+                    current = song.id == selectedId,
+                    setName = setName,
+                    onRemoveFromSet = onRemoveFromSet,
+                    onToggleFavorite = onToggleFavorite,
+                    onOpen = onOpen,
                 )
             }
         }
     }
+}
+
+/** One hymn row: number chip, title, set-remove and favourite. */
+@Composable
+private fun SongRow(
+    song: Song,
+    starred: Boolean,
+    current: Boolean,
+    setName: String?,
+    onRemoveFromSet: (String, String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    onOpen: (Song) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onOpen(song) }
+            .background(
+                if (current) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background,
+            )
+            .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (song.number != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(7.dp),
+            ) {
+                Text(
+                    song.number,
+                    fontFamily = Ui,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                song.title,
+                fontFamily = Lora,
+                fontSize = 17.5.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.2).sp,
+            )
+            if (song.artist != null) {
+                Text(
+                    song.artist,
+                    fontFamily = Ui,
+                    fontSize = 11.5.sp,
+                    letterSpacing = 0.2.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+        }
+        if (setName != null) {
+            IconButton(onClick = { onRemoveFromSet(setName, song.id) }) {
+                Icon(
+                    Icons.Default.Close,
+                    "Remove from $setName",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+        }
+        IconButton(onClick = { onToggleFavorite(song.id) }) {
+            Icon(
+                if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                if (starred) "Remove from favorites" else "Add to favorites",
+                tint = if (starred) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                },
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+    )
 }
 
 private const val ALL = "all"
@@ -370,7 +419,7 @@ private fun NumberPadDialog(songs: List<Song>, onDismiss: () -> Unit, onOpen: (S
                 Text("Jump to a song", fontFamily = Lora, fontWeight = FontWeight.Bold)
                 Text(
                     if (input.isBlank()) "Type a hymn number" else "#$input",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -392,7 +441,7 @@ private fun NumberPadDialog(songs: List<Song>, onDismiss: () -> Unit, onOpen: (S
                         ) {
                             Text(
                                 "#${exact.number}",
-                                fontFamily = Inter,
+                                fontFamily = Ui,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onPrimary,
@@ -427,7 +476,7 @@ private fun NumberPadDialog(songs: List<Song>, onDismiss: () -> Unit, onOpen: (S
                         ) {
                             Text(
                                 "#${song.number}",
-                                fontFamily = Inter,
+                                fontFamily = Ui,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -469,7 +518,7 @@ private fun NumberPadDialog(songs: List<Song>, onDismiss: () -> Unit, onOpen: (S
                                 ) {
                                     Text(
                                         key,
-                                        fontFamily = Inter,
+                                        fontFamily = Ui,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -609,7 +658,7 @@ fun SongDetailScreen(
                 if (song.artist != null) {
                     Text(
                         song.artist,
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 11.5.sp,
                         letterSpacing = 0.2.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -625,7 +674,7 @@ fun SongDetailScreen(
                     }
                     Text(
                         "${(zoom * 100).toInt()}%",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -699,45 +748,81 @@ fun SongDetailScreen(
                 if (block.chorus) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 5.dp),
+                            .padding(vertical = 4.dp),
                     ) {
-                        Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
-                            Text(
-                                "CHORUS",
-                                fontFamily = Inter,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                letterSpacing = 1.6.sp,
+                        Row(Modifier.height(IntrinsicSize.Min)) {
+                            Box(
+                                Modifier
+                                    .width(3.dp)
+                                    .fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.primary),
                             )
-                            Spacer(Modifier.height(3.dp))
-                            Text(block.text, fontFamily = Lora, fontSize = lyricSize.sp, lineHeight = lyricLine.sp)
+                            Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp)) {
+                                Text(
+                                    "CHORUS",
+                                    fontFamily = Ui,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.6.sp,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    block.text,
+                                    fontFamily = Lora,
+                                    fontSize = lyricSize.sp,
+                                    lineHeight = lyricLine.sp,
+                                )
+                            }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                 } else {
-                    Row(Modifier.padding(vertical = 5.dp)) {
-                        Text(
-                            "${block.number}.",
-                            fontFamily = Lora,
-                            fontSize = (lyricSize - 4).sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(18.dp),
-                        )
-                        Text(block.text, fontFamily = Lora, fontSize = lyricSize.sp, lineHeight = lyricLine.sp)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                    ) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 13.dp)) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                shape = CircleShape,
+                            ) {
+                                Text(
+                                    "${block.number}",
+                                    fontFamily = Ui,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Text(
+                                block.text,
+                                fontFamily = Lora,
+                                fontSize = lyricSize.sp,
+                                lineHeight = lyricLine.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(5.dp))
+                    Spacer(Modifier.height(6.dp))
                 }
             }
             if (hideChorus && blocks.any { it.chorus }) {
                 item {
                     Text(
                         "Chorus hidden · tap Chorus shown above to bring it back",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 10.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp),
@@ -748,6 +833,7 @@ fun SongDetailScreen(
         PrevNextBar(
             position = position,
             total = total,
+            songNumber = song.number,
             hasPrev = onPrev != null,
             hasNext = onNext != null,
             onPrev = onPrev,
@@ -761,6 +847,7 @@ fun SongDetailScreen(
 private fun PrevNextBar(
     position: Int,
     total: Int,
+    songNumber: String?,
     hasPrev: Boolean,
     hasNext: Boolean,
     onPrev: (() -> Unit)?,
@@ -785,8 +872,8 @@ private fun PrevNextBar(
                 )
             }
             Text(
-                "${position + 1} of $total",
-                fontFamily = Inter,
+                if (songNumber == null) "Anthem" else "${position + 1} of $total",
+                fontFamily = Ui,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -835,7 +922,7 @@ private fun AddToSetDialog(
                 if (playlists.isEmpty()) {
                     Text(
                         "No sets yet. Create one below - Sunday Service, Morning Hoon Dok Hae, anything.",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -851,14 +938,14 @@ private fun AddToSetDialog(
                     ) {
                         Text(
                             name,
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 13.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                         )
                         Text(
                             if (inside) "added" else "${ids.size} songs",
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 10.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -887,7 +974,7 @@ private fun AddToSetDialog(
                             if (newName.isEmpty()) {
                                 Text(
                                     "New set name",
-                                    fontFamily = Inter,
+                                    fontFamily = Ui,
                                     fontSize = 12.5.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -940,7 +1027,7 @@ fun ZoomButton(label: String, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            fontFamily = Inter,
+            fontFamily = Ui,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
@@ -998,7 +1085,7 @@ fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
         Text(
             label,
             fontSize = 11.5.sp,
-            fontFamily = Inter,
+            fontFamily = Ui,
             fontWeight = FontWeight.SemiBold,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),

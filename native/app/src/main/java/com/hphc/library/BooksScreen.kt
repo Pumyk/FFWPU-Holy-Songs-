@@ -383,7 +383,7 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
             IconButton(onClick = { jumpOpen = true }, modifier = Modifier.size(34.dp)) {
                 Text(
                     "#",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -646,7 +646,7 @@ private fun PageJumpDialog(
             Column {
                 Text(
                     "Page ${target.toInt()} of $pageCount",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -680,7 +680,7 @@ private fun QuickPageChip(label: String, selectedQuick: Boolean, onClick: () -> 
     ) {
         Text(
             label,
-            fontFamily = Inter,
+            fontFamily = Ui,
             fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (selectedQuick) {
@@ -713,7 +713,7 @@ private fun BookmarksDialog(
                 Text("Bookmarks", fontFamily = Lora, fontWeight = FontWeight.Bold)
                 Text(
                     "Page $currentPage",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -724,7 +724,7 @@ private fun BookmarksDialog(
                 if (marks.isEmpty()) {
                     Text(
                         "No bookmarks yet. Name this page below and it will be waiting for you next time.",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -747,13 +747,13 @@ private fun BookmarksDialog(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 mark.label,
-                                fontFamily = Inter,
+                                fontFamily = Ui,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 "page ${mark.page}",
-                                fontFamily = Inter,
+                                fontFamily = Ui,
                                 fontSize = 10.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -783,7 +783,7 @@ private fun BookmarksDialog(
                                 if (label.isEmpty()) {
                                     Text(
                                         "Name this page",
-                                        fontFamily = Inter,
+                                        fontFamily = Ui,
                                         fontSize = 12.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -811,7 +811,7 @@ private fun BookmarksDialog(
                 } else {
                     Text(
                         "This page is saved as \"${here.label}\".",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 11.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -86,7 +86,7 @@ fun NewsScreen(
                 )
                 Text(
                     if (refreshing) "Refreshing…" else "Tap an edition to watch · $channel",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -99,7 +99,7 @@ fun NewsScreen(
                 item {
                     Text(
                         "No editions loaded yet. Pull down, or tap the line above, to refresh.",
-                        fontFamily = Inter,
+                        fontFamily = Ui,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -120,7 +120,7 @@ fun NewsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     prettyDate(n.date).uppercase(Locale.getDefault()),
-                                    fontFamily = Inter,
+                                    fontFamily = Ui,
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.1.sp,
@@ -145,7 +145,7 @@ fun NewsScreen(
                                             Spacer(Modifier.width(3.dp))
                                             Text(
                                                 "WATCHED",
-                                                fontFamily = Inter,
+                                                fontFamily = Ui,
                                                 fontSize = 8.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.6.sp,
@@ -166,7 +166,7 @@ fun NewsScreen(
                             if (n.views > 0) {
                                 Text(
                                     prettyViews(n.views),
-                                    fontFamily = Inter,
+                                    fontFamily = Ui,
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 3.dp),
@@ -191,7 +191,7 @@ fun NewsScreen(
                                 Spacer(Modifier.width(3.dp))
                                 Text(
                                     if (seen) "Again" else "Watch",
-                                    fontFamily = Inter,
+                                    fontFamily = Ui,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimary,

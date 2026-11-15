@@ -95,7 +95,7 @@ fun PledgeScreen(
                 }
                 Text(
                     "${(zoom * 100).toInt()}%",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -175,28 +175,43 @@ private fun PledgeList(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
     ) {
         itemsIndexed(verses, key = { _, v -> v.number }) { idx, v ->
-            Row(Modifier.padding(bottom = 18.dp)) {
-                Text(
-                    verses[idx].number,
-                    fontFamily = face,
-                    fontSize = (body - 2).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.width(26.dp),
-                )
-                Text(
-                    v.text,
-                    fontFamily = face,
-                    fontSize = body.sp,
-                    lineHeight = leading.sp,
-                    letterSpacing = 0.1.sp,
-                    modifier = Modifier.weight(1f),
-                )
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(18.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+            ) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        shape = CircleShape,
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                verses[idx].number,
+                                fontFamily = Ui,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        v.text,
+                        fontFamily = face,
+                        fontSize = body.sp,
+                        lineHeight = leading.sp,
+                        letterSpacing = 0.1.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.padding(bottom = 18.dp),
-            )
         }
     }
 }
@@ -236,7 +251,7 @@ private fun RecitePager(
                     ) {
                         Text(
                             "PLEDGE ${verse.number}",
-                            fontFamily = Inter,
+                            fontFamily = Ui,
                             fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.6.sp,
@@ -285,7 +300,7 @@ private fun RecitePager(
             ) {
                 Text(
                     "${pager.currentPage + 1} of ${verses.size}",
-                    fontFamily = Inter,
+                    fontFamily = Ui,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -331,7 +346,7 @@ private fun RecitePager(
         }
         Text(
             "Swipe for the next pledge",
-            fontFamily = Inter,
+            fontFamily = Ui,
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
