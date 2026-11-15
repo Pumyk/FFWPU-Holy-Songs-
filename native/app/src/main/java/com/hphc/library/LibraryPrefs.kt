@@ -30,6 +30,13 @@ class LibraryPrefs(ctx: Context) {
     /** Starred songs, newest first is not meaningful, so keep song order. */
     fun favoriteCount(): Int = favorites.size
 
+    /** System / Light / Dark / AMOLED, chosen in the nav drawer. */
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromName(sp.getString(KEY_THEME, ThemeMode.System.name))
+        set(value) {
+            sp.edit().putString(KEY_THEME, value.name).apply()
+        }
+
     var lyricZoom: Float
         get() = sp.getFloat(KEY_ZOOM, 1f).coerceIn(MIN_ZOOM, MAX_ZOOM)
         set(value) {
@@ -40,6 +47,7 @@ class LibraryPrefs(ctx: Context) {
         private const val FILE = "hphc-library"
         private const val KEY_FAVORITES = "favorites"
         private const val KEY_ZOOM = "lyric-zoom"
+        private const val KEY_THEME = "theme-mode"
 
         const val MIN_ZOOM = 0.85f
         const val MAX_ZOOM = 1.6f

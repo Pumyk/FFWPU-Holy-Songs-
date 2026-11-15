@@ -74,16 +74,24 @@ fun SongsScreen(
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            Text("Holy Songs", fontFamily = Lora, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Holy Songs",
+                fontFamily = Lora,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp,
+            )
             Text(
                 if (onlyFavorites) {
                     "${favorites.size} saved"
                 } else {
                     "${songs.size} songs ready"
                 },
+                fontFamily = Inter,
                 color = MaterialTheme.colorScheme.primary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.3.sp,
             )
             Spacer(Modifier.height(12.dp))
             SearchField(query) { query = it }
@@ -124,21 +132,32 @@ fun SongsScreen(
                         ) {
                             Text(
                                 song.number,
+                                fontFamily = Inter,
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                             )
                         }
                         Spacer(Modifier.width(12.dp))
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(song.title, fontFamily = Lora, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            song.title,
+                            fontFamily = Lora,
+                            fontSize = 17.5.sp,
+                            lineHeight = 22.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = (-0.2).sp,
+                        )
                         if (song.artist != null) {
                             Text(
                                 song.artist,
-                                fontSize = 11.sp,
+                                fontFamily = Inter,
+                                fontSize = 11.5.sp,
+                                letterSpacing = 0.2.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 1.dp),
                             )
                         }
                     }
@@ -236,7 +255,7 @@ fun SongDetailScreen(
     val ctx = LocalContext.current
     val blocks = remember(song.id) { lyricBlocks(song.lyrics) }
     val lyricSize = 18f * zoom
-    val lyricLine = 30f * zoom
+    val lyricLine = lyricSize * 1.7f
 
     // Plain-text version of the song for the share sheet / clipboard.
     val shareText = remember(song.id) {
@@ -271,6 +290,7 @@ fun SongDetailScreen(
     }
 
     LazyColumn(
+        modifier = Modifier.pinchToZoom { factor -> onZoom(clampZoom(zoom * factor)) },
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 44.dp),
     ) {
         item {
@@ -291,17 +311,20 @@ fun SongDetailScreen(
                 Text(
                     song.title,
                     fontFamily = Lora,
-                    fontSize = 26.sp,
+                    fontSize = 27.sp,
                     fontWeight = FontWeight.Bold,
-                    lineHeight = 31.sp,
+                    lineHeight = 33.sp,
+                    letterSpacing = (-0.4).sp,
                 )
             }
             if (song.artist != null) {
                 Text(
                     song.artist,
-                    fontSize = 11.sp,
+                    fontFamily = Inter,
+                    fontSize = 11.5.sp,
+                    letterSpacing = 0.2.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 3.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
             Spacer(Modifier.height(10.dp))
@@ -313,6 +336,7 @@ fun SongDetailScreen(
                 }
                 Text(
                     "${(zoom * 100).toInt()}%",
+                    fontFamily = Inter,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -365,10 +389,11 @@ fun SongDetailScreen(
                     Column(Modifier.padding(horizontal = 13.dp, vertical = 11.dp)) {
                         Text(
                             "CHORUS",
+                            fontFamily = Inter,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.6.sp,
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(block.text, fontFamily = Lora, fontSize = lyricSize.sp, lineHeight = lyricLine.sp)
@@ -394,7 +419,7 @@ fun SongDetailScreen(
 }
 
 @Composable
-private fun ZoomButton(label: String, onClick: () -> Unit) {
+fun ZoomButton(label: String, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(50),
@@ -402,8 +427,9 @@ private fun ZoomButton(label: String, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            fontFamily = Inter,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
         )
@@ -427,39 +453,67 @@ fun lyricBlocks(lyrics: String): List<LyricBlock> {
 }
 
 @Composable
-fun PledgeScreen(verses: List<PledgeVerse>) {
-    LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+fun PledgeScreen(verses: List<PledgeVerse>, zoom: Float, onZoom: (Float) -> Unit) {
+    val body = 17f * zoom
+    val leading = 29f * zoom
+
+    LazyColumn(
+        modifier = Modifier.pinchToZoom { factor -> onZoom(clampZoom(zoom * factor)) },
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+    ) {
         item {
-            Text("Family Pledge", fontFamily = Lora, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(
-                "Eight pledges · centering on true love",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 12.sp,
+                "Family Pledge",
+                fontFamily = Lora,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp),
+                letterSpacing = (-0.5).sp,
             )
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ZoomButton("A−") {
+                    if (zoom > LibraryPrefs.MIN_ZOOM + 0.001f) {
+                        onZoom(clampZoom(zoom - LibraryPrefs.STEP_ZOOM))
+                    }
+                }
+                Text(
+                    "${(zoom * 100).toInt()}%",
+                    fontFamily = Inter,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                )
+                ZoomButton("A+") {
+                    if (zoom < LibraryPrefs.MAX_ZOOM - 0.001f) {
+                        onZoom(clampZoom(zoom + LibraryPrefs.STEP_ZOOM))
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
         }
         items(verses, key = { it.number }) { v ->
-            Row(Modifier.padding(bottom = 16.dp)) {
+            Row(Modifier.padding(bottom = 18.dp)) {
                 Text(
                     v.number,
                     fontFamily = Lora,
-                    fontSize = 22.sp,
+                    fontSize = (body - 2).sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.width(30.dp),
+                    modifier = Modifier.width(26.dp),
                 )
                 Text(
                     v.text,
                     fontFamily = Lora,
-                    fontSize = 15.5.sp,
-                    lineHeight = 25.sp,
+                    fontSize = body.sp,
+                    lineHeight = leading.sp,
+                    letterSpacing = 0.1.sp,
                     modifier = Modifier.weight(1f),
                 )
             }
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.padding(bottom = 16.dp),
+                modifier = Modifier.padding(bottom = 18.dp),
             )
         }
     }
