@@ -55,7 +55,10 @@ export default function NewsPage() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(REMOTE_URL, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`${REMOTE_URL}?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      });
       if (res.ok) {
         const fresh = (await res.json()) as NewsData;
         if (Array.isArray(fresh.items) && fresh.items.length > 0) {
@@ -190,7 +193,7 @@ export default function NewsPage() {
               <div className="mt-5 flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cream-100 dark:bg-night-700 text-[10px] font-black uppercase tracking-[0.14em] text-ink-700 dark:text-muted-warm">
                   <Youtube className="w-3.5 h-3.5 text-ember dark:text-amber-brand" />
-                  {data.channel.title}
+                  {data.channel?.title || 'HJ PeaceTV'}
                 </span>
                 <a
                   href={latest.url}
