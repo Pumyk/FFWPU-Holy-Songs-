@@ -12,6 +12,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,23 +81,40 @@ sealed interface Route {
     data class SectionRoute(val section: Section) : Route
     data class SongRoute(val song: Song) : Route
     data class BookRoute(val book: Book) : Route
+    data class VideoRoute(val item: NewsItem) : Route
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { HphcTheme { App() } }
+        val prefs = LibraryPrefs(this)
+        setContent {
+            var themeMode by remember { mutableStateOf(prefs.themeMode) }
+            HphcTheme(themeMode) {
+                App(
+                    prefs = prefs,
+                    themeMode = themeMode,
+                    onThemeMode = {
+                        themeMode = it
+                        prefs.themeMode = it
+                    },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun App() {
+private fun App(
+    prefs: LibraryPrefs,
+    themeMode: ThemeMode,
+    onThemeMode: (ThemeMode) -> Unit,
+) {
     val ctx = LocalContext.current
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var route by remember { mutableStateOf<Route>(Route.Home) }
-    val prefs = remember { LibraryPrefs(ctx) }
     var favorites by remember { mutableStateOf(prefs.favorites) }
     var lyricZoom by remember { mutableFloatStateOf(prefs.lyricZoom) }
 
@@ -132,6 +151,7 @@ private fun App() {
         route = when (val r = route) {
             is Route.SongRoute -> Route.SectionRoute(Section.Songs)
             is Route.BookRoute -> Route.SectionRoute(Section.Books)
+            is Route.VideoRoute -> Route.SectionRoute(Section.News)
             else -> Route.Home
         }
     }
@@ -182,6 +202,34 @@ private fun App() {
                         }
                         Spacer(Modifier.height(4.dp))
                     }
+                    Spacer(Modifier.height(26.dp))
+                    Text(
+                        "APPEARANCE",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.4.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    // Two rows of two: four pills do not fit one row in a 78% drawer.
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ThemePill(ThemeMode.System.label, themeMode == ThemeMode.System) {
+                                onThemeMode(ThemeMode.System)
+                            }
+                            ThemePill(ThemeMode.Light.label, themeMode == ThemeMode.Light) {
+                                onThemeMode(ThemeMode.Light)
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ThemePill(ThemeMode.Dark.label, themeMode == ThemeMode.Dark) {
+                                onThemeMode(ThemeMode.Dark)
+                            }
+                            ThemePill(ThemeMode.Amoled.label, themeMode == ThemeMode.Amoled) {
+                                onThemeMode(ThemeMode.Amoled)
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -205,6 +253,7 @@ private fun App() {
                                 route = when (val r = route) {
                                     is Route.SongRoute -> Route.SectionRoute(Section.Songs)
                                     is Route.BookRoute -> Route.SectionRoute(Section.Books)
+                                    is Route.VideoRoute -> Route.SectionRoute(Section.News)
                                     else -> Route.Home
                                 }
                             }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
@@ -215,6 +264,7 @@ private fun App() {
                                 is Route.SectionRoute -> r.section.label
                                 is Route.SongRoute -> "Holy Songs"
                                 is Route.BookRoute -> "Books"
+                                is Route.VideoRoute -> "HJ Global News"
                             },
                             fontFamily = Lora,
                             fontSize = 17.sp,
@@ -240,8 +290,6 @@ private fun App() {
                 ) { r ->
                     when (r) {
                         is Route.Home -> HomeScreen(
-                            songCount = songs.size,
-                            favoriteCount = favorites.size,
                             onPick = { route = Route.SectionRoute(it) },
                         )
                         is Route.SectionRoute -> when (r.section) {
@@ -250,19 +298,32 @@ private fun App() {
                                 favorites = favorites,
                                 onToggleFavorite = { favorites = prefs.toggleFavorite(it) },
                             ) { route = Route.SongRoute(it) }
-                            Section.Pledge -> PledgeScreen(pledge)
+                            Section.Pledge -> PledgeScreen(
+                                verses = pledge,
+                                zoom = lyricZoom,
+                                onZoom = {
+                                    lyricZoom = it
+                                    prefs.lyricZoom = it
+                                },
+                            )
                             Section.Books -> BooksScreen(remoteBooks, shelfRefreshing) { route = Route.BookRoute(it) }
-                            Section.News -> NewsScreen(news, channel, newsRefreshing) {
-                                scope.launch {
-                                    newsRefreshing = true
-                                    val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
-                                    if (fresh != null) {
-                                        news = fresh.first
-                                        channel = fresh.second
+                            Section.News -> NewsScreen(
+                                items = news,
+                                channel = channel,
+                                refreshing = newsRefreshing,
+                                onRefresh = {
+                                    scope.launch {
+                                        newsRefreshing = true
+                                        val fresh = withContext(Dispatchers.IO) { Data.remoteNews() }
+                                        if (fresh != null) {
+                                            news = fresh.first
+                                            channel = fresh.second
+                                        }
+                                        newsRefreshing = false
                                     }
-                                    newsRefreshing = false
-                                }
-                            }
+                                },
+                                onPlay = { route = Route.VideoRoute(it) },
+                            )
                         }
                         is Route.SongRoute -> SongDetailScreen(
                             song = r.song,
@@ -275,6 +336,7 @@ private fun App() {
                             },
                         )
                         is Route.BookRoute -> PdfBookScreen(r.book)
+                        is Route.VideoRoute -> YouTubeScreen(r.item)
                     }
                 }
             }
@@ -283,25 +345,28 @@ private fun App() {
 }
 
 @Composable
-private fun HomeScreen(songCount: Int, favoriteCount: Int, onPick: (Section) -> Unit) {
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+private fun HomeScreen(onPick: (Section) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+    ) {
         Text(
             "Welcome back",
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.6.sp,
             color = MaterialTheme.colorScheme.primary,
         )
-        Text("HPHC Library", fontFamily = Lora, fontSize = 38.sp, fontWeight = FontWeight.Bold, lineHeight = 42.sp)
         Text(
-            if (favoriteCount > 0) {
-                "$songCount songs · $favoriteCount saved · offline ready"
-            } else {
-                "$songCount songs · offline ready"
-            },
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+            "HPHC Library",
+            fontFamily = Lora,
+            fontSize = 38.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 43.sp,
+            letterSpacing = (-0.6).sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 24.dp),
         )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Section.entries.forEach { s ->
@@ -327,8 +392,20 @@ private fun HomeScreen(songCount: Int, favoriteCount: Int, onPick: (Section) -> 
                         }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(s.label, fontFamily = Lora, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                            Text(s.blurb, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                s.label,
+                                fontFamily = Lora,
+                                fontSize = 17.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = (-0.1).sp,
+                            )
+                            Text(
+                                s.blurb,
+                                fontFamily = Inter,
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 1.dp),
+                            )
                         }
                         Icon(
                             Icons.AutoMirrored.Filled.KeyboardArrowRight, null,
@@ -339,14 +416,5 @@ private fun HomeScreen(songCount: Int, favoriteCount: Int, onPick: (Section) -> 
                 }
             }
         }
-        Text(
-            "HPHC · Holy Songs & texts",
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 22.dp),
-        )
     }
 }
