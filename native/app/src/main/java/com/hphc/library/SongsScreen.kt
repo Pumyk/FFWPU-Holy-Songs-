@@ -1,5 +1,10 @@
 package com.hphc.library
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,7 +38,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,47 +45,76 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun SongsScreen(songs: List<Song>, onOpen: (Song) -> Unit) {
+fun SongsScreen(
+    songs: List<Song>,
+    favorites: Set<String>,
+    onToggleFavorite: (String) -> Unit,
+    onOpen: (Song) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
-    val filtered = remember(songs, query) {
+    var onlyFavorites by rememberSaveable { mutableStateOf(false) }
+
+    val searched = remember(songs, query) {
         if (query.isBlank()) songs
         else songs.filter {
             it.title.contains(query, true) || it.number == query ||
                 it.lyrics.contains(query, true) || (it.artist ?: "").contains(query, true)
         }
     }
+    val filtered = remember(searched, onlyFavorites, favorites) {
+        if (onlyFavorites) searched.filter { favorites.contains(it.id) } else searched
+    }
+
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
             Text("Holy Songs", fontFamily = Lora, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(
-                "${songs.size} songs ready",
+                if (onlyFavorites) {
+                    "${favorites.size} saved"
+                } else {
+                    "${songs.size} songs ready"
+                },
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(12.dp))
             SearchField(query) { query = it }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterPill("All ${songs.size}", selected = !onlyFavorites) { onlyFavorites = false }
+                FilterPill("Favorites ${favorites.size}", selected = onlyFavorites) { onlyFavorites = true }
+            }
+            Spacer(Modifier.height(4.dp))
         }
         if (filtered.isEmpty()) {
             Text(
-                "No song matches \"$query\"",
+                when {
+                    onlyFavorites && query.isBlank() ->
+                        "No favorites yet. Tap the heart on any song to keep it here."
+                    onlyFavorites -> "No favorite matches \"$query\""
+                    else -> "No song matches \"$query\""
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
                 modifier = Modifier.padding(20.dp),
             )
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 30.dp)) {
             items(filtered, key = { it.id }) { song ->
+                val starred = favorites.contains(song.id)
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clickable { onOpen(song) }
-                        .padding(horizontal = 20.dp, vertical = 11.dp),
+                        .padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (song.number != null) {
@@ -95,7 +132,7 @@ fun SongsScreen(songs: List<Song>, onOpen: (Song) -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                     }
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(song.title, fontFamily = Lora, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                         if (song.artist != null) {
                             Text(
@@ -104,6 +141,18 @@ fun SongsScreen(songs: List<Song>, onOpen: (Song) -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                    }
+                    IconButton(onClick = { onToggleFavorite(song.id) }) {
+                        Icon(
+                            if (starred) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            if (starred) "Remove from favorites" else "Add to favorites",
+                            tint = if (starred) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            },
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                 }
                 HorizontalDivider(
@@ -154,13 +203,72 @@ private fun SearchField(value: String, onChange: (String) -> Unit) {
     }
 }
 
-/** Song page: compact header (top bar handles back), verse/chorus lyrics, A-/A+ zoom. */
 @Composable
-fun SongDetailScreen(song: Song) {
+private fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Text(
+            label,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/** Song page: compact header (top bar handles back), verse/chorus lyrics, A-/A+ zoom, star + share. */
+@Composable
+fun SongDetailScreen(
+    song: Song,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    zoom: Float,
+    onZoom: (Float) -> Unit,
+) {
+    val ctx = LocalContext.current
     val blocks = remember(song.id) { lyricBlocks(song.lyrics) }
-    var zoom by rememberSaveable(song.id) { mutableFloatStateOf(1f) }
     val lyricSize = 18f * zoom
     val lyricLine = 30f * zoom
+
+    // Plain-text version of the song for the share sheet / clipboard.
+    val shareText = remember(song.id) {
+        buildString {
+            append(song.title)
+            if (song.number != null) append(" (Holy Songs #").append(song.number).append(")")
+            append("\n\n")
+            append(
+                blocks.joinToString("\n\n") { block ->
+                    if (block.chorus) "Chorus:\n" + block.text else block.text
+                }
+            )
+            append("\n\n— HPHC Library")
+        }
+    }
+
+    fun shareSong() {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, song.title)
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        val chooser = Intent.createChooser(send, "Share lyrics")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(chooser) }
+    }
+
+    fun copySong() {
+        val clip = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        clip.setPrimaryClip(ClipData.newPlainText(song.title, shareText))
+        Toast.makeText(ctx, "Lyrics copied", Toast.LENGTH_SHORT).show()
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 44.dp),
@@ -198,7 +306,11 @@ fun SongDetailScreen(song: Song) {
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ZoomButton("A−") { if (zoom > 0.85f) zoom -= 0.1f }
+                ZoomButton("A−") {
+                    if (zoom > LibraryPrefs.MIN_ZOOM + 0.001f) {
+                        onZoom(zoom - LibraryPrefs.STEP_ZOOM)
+                    }
+                }
                 Text(
                     "${(zoom * 100).toInt()}%",
                     fontSize = 11.sp,
@@ -206,7 +318,38 @@ fun SongDetailScreen(song: Song) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 10.dp),
                 )
-                ZoomButton("A+") { if (zoom < 1.6f) zoom += 0.1f }
+                ZoomButton("A+") {
+                    if (zoom < LibraryPrefs.MAX_ZOOM - 0.001f) {
+                        onZoom(zoom + LibraryPrefs.STEP_ZOOM)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                IconButton(onClick = { copySong() }) {
+                    Icon(
+                        Icons.Default.ContentCopy, "Copy lyrics",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                IconButton(onClick = { shareSong() }) {
+                    Icon(
+                        Icons.Default.Share, "Share lyrics",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
             Spacer(Modifier.height(14.dp))
         }

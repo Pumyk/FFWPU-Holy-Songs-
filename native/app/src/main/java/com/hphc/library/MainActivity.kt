@@ -50,6 +50,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -94,6 +95,9 @@ private fun App() {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var route by remember { mutableStateOf<Route>(Route.Home) }
+    val prefs = remember { LibraryPrefs(ctx) }
+    var favorites by remember { mutableStateOf(prefs.favorites) }
+    var lyricZoom by remember { mutableFloatStateOf(prefs.lyricZoom) }
 
     val bundled = remember { Data.bundledSongs(ctx) }
     var remote by remember { mutableStateOf<List<Song>>(emptyList()) }
@@ -237,10 +241,15 @@ private fun App() {
                     when (r) {
                         is Route.Home -> HomeScreen(
                             songCount = songs.size,
+                            favoriteCount = favorites.size,
                             onPick = { route = Route.SectionRoute(it) },
                         )
                         is Route.SectionRoute -> when (r.section) {
-                            Section.Songs -> SongsScreen(songs) { route = Route.SongRoute(it) }
+                            Section.Songs -> SongsScreen(
+                                songs = songs,
+                                favorites = favorites,
+                                onToggleFavorite = { favorites = prefs.toggleFavorite(it) },
+                            ) { route = Route.SongRoute(it) }
                             Section.Pledge -> PledgeScreen(pledge)
                             Section.Books -> BooksScreen(remoteBooks, shelfRefreshing) { route = Route.BookRoute(it) }
                             Section.News -> NewsScreen(news, channel, newsRefreshing) {
@@ -255,7 +264,16 @@ private fun App() {
                                 }
                             }
                         }
-                        is Route.SongRoute -> SongDetailScreen(r.song)
+                        is Route.SongRoute -> SongDetailScreen(
+                            song = r.song,
+                            isFavorite = favorites.contains(r.song.id),
+                            onToggleFavorite = { favorites = prefs.toggleFavorite(r.song.id) },
+                            zoom = lyricZoom,
+                            onZoom = {
+                                lyricZoom = it
+                                prefs.lyricZoom = it
+                            },
+                        )
                         is Route.BookRoute -> PdfBookScreen(r.book)
                     }
                 }
@@ -265,7 +283,7 @@ private fun App() {
 }
 
 @Composable
-private fun HomeScreen(songCount: Int, onPick: (Section) -> Unit) {
+private fun HomeScreen(songCount: Int, favoriteCount: Int, onPick: (Section) -> Unit) {
     Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
         Text(
             "Welcome back",
@@ -276,7 +294,11 @@ private fun HomeScreen(songCount: Int, onPick: (Section) -> Unit) {
         )
         Text("HPHC Library", fontFamily = Lora, fontSize = 38.sp, fontWeight = FontWeight.Bold, lineHeight = 42.sp)
         Text(
-            "$songCount songs · offline ready",
+            if (favoriteCount > 0) {
+                "$songCount songs · $favoriteCount saved · offline ready"
+            } else {
+                "$songCount songs · offline ready"
+            },
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
