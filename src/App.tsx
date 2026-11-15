@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type TouchEvent as ReactTouchEvent } from 'react';
-import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, Sparkles, ZoomIn, ZoomOut, RotateCcw, HeartHandshake, Menu, ScrollText, Library, Newspaper } from 'lucide-react';
+import { Search, Moon, Sun, ChevronLeft, ChevronRight, Book, X, Music2, ZoomIn, ZoomOut, RotateCcw, HeartHandshake, Menu, ScrollText, Library, Newspaper } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Song } from './types';
 import songsHtml from './songs.html?raw';
@@ -113,18 +113,18 @@ const LyricsDisplay = ({ lyrics }: { lyrics: string }) => {
   });
 
   return (
-    <div className="font-serif font-medium leading-[1.75] text-[1em] text-ink-900 dark:text-creamtext space-y-12 pb-12">
+    <div className="font-serif font-medium leading-[1.75] text-[1em] text-ink-900 dark:text-creamtext space-y-10 pb-8">
       {items.map((item, index) => {
         if (item.type === 'chorus') return null;
 
         return (
           <div key={index} className="space-y-12">
             <div
-              className="relative group pl-12 md:pl-16"
+              className="relative group pl-7 md:pl-9"
             >
               {/* Floating verse number bubble */}
               <div
-                className="absolute left-0 top-0 flex items-center justify-center w-9 h-9 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-xs font-black font-mono text-ember dark:text-amber-brand group-hover:scale-110 group-hover:bg-amber-brand group-hover:text-black transition-all duration-300 shadow-sm"
+                className="absolute left-0 top-1.5 flex items-center justify-center w-5 h-5 rounded-full bg-cream-100 dark:bg-night-800 text-[10px] font-black font-mono text-ember dark:text-amber-brand"
               >
                 {item.number}
               </div>
@@ -274,7 +274,7 @@ export default function App() {
 
   useEffect(() => {
     if (!showSplash) return;
-    const t = setTimeout(() => setShowSplash(false), 1200);
+    const t = setTimeout(() => setShowSplash(false), 450);
     return () => clearTimeout(t);
   }, [showSplash]);
 
@@ -632,47 +632,24 @@ export default function App() {
               transition={FAST}
               className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
             >
-              {/* Song Detail Header */}
-              <div className="px-6 md:px-10 pt-10 md:pt-16 max-w-2xl mx-auto relative">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-80 h-44 pointer-events-none" style={{ background: 'radial-gradient(closest-side, color-mix(in srgb, var(--color-amber-brand) 18%, transparent), transparent)' }} />
+              {/* Song Detail Header (compact: title + number only) */}
+              <div className="px-5 md:px-10 pt-5 md:pt-8 max-w-2xl mx-auto relative">
 
-                <div className="relative">
-                  <div className="flex flex-wrap items-center gap-2.5 mb-6">
-                    {selectedSong.number && (
-                      <span className="px-3.5 py-1.5 rounded-full bg-black dark:bg-amber-brand text-amber-brand dark:text-black font-mono font-black text-sm tracking-tight shadow-lg">
-                        {selectedSong.number}
-                      </span>
-                    )}
-                    {selectedSong.category && (
-                      <span className="px-3 py-1.5 rounded-full bg-cream-100 dark:bg-night-800 border border-cream-200 dark:border-white/5 text-[10px] font-black uppercase tracking-[0.15em] text-ink-700 dark:text-muted-warm">
-                        {selectedSong.category.replace(/-/g, ' ')}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-4xl md:text-6xl font-black text-ink-900 dark:text-creamtext mb-7 leading-[1.02] tracking-tight">
+                <div className="relative flex items-start gap-3">
+                  {selectedSong.number && (
+                    <span className="flex-shrink-0 mt-1 px-2.5 py-1 rounded-full bg-black dark:bg-amber-brand text-amber-brand dark:text-black font-mono font-black text-xs tracking-tight">
+                      {selectedSong.number}
+                    </span>
+                  )}
+                  <h2 className="text-2xl md:text-4xl font-black text-ink-900 dark:text-creamtext leading-[1.15] tracking-tight">
                     {selectedSong.title}
                   </h2>
-                  <div className="flex flex-wrap gap-x-8 gap-y-2 text-[11px] text-ink-700 dark:text-muted-warm font-bold uppercase tracking-[0.15em]">
-                    {selectedSong.artist && (
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-ember dark:text-amber-brand" />
-                        <span className="opacity-60">By</span>
-                        <span className="text-ink-900 dark:text-creamtext/85">{selectedSong.artist}</span>
-                      </div>
-                    )}
-                    {selectedSong.album && (
-                      <div className="flex items-center gap-2">
-                        <span className="opacity-60">Album</span>
-                        <span className="text-ink-900 dark:text-creamtext/85">{selectedSong.album}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
 
               <div className="px-6 md:px-10 max-w-2xl mx-auto">
                 {/* Zoom toolbar: in-flow so it never covers lyric text */}
-                <div className="flex justify-end mb-5">
+                <div className="flex justify-end mb-4">
                   <div className="flex items-center gap-0.5 rounded-full bg-ink-900 dark:bg-night-800 border border-white/10 shadow-xl px-1 py-1">
                     <motion.button
                       whileTap={{ scale: 0.85 }}
@@ -837,10 +814,8 @@ export default function App() {
                     {filteredSongs.map((song) => (
                       <motion.button
                         key={song.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={TAP}
                         whileTap={{ scale: 0.98 }}
+                        transition={TAP}
                         onClick={() => goSong(song)}
                         className="w-full text-left p-4 rounded-[24px] bg-white dark:bg-night-800 border border-cream-200 dark:border-white/[0.04] hover:border-amber-brand/40 dark:hover:border-amber-brand/30 hover:shadow-lg hover:shadow-amber-brand/5 dark:hover:bg-night-700/60 transition-all group flex items-center gap-4"
                       >
