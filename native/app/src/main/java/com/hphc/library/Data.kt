@@ -3,6 +3,7 @@ package com.hphc.library
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -18,18 +19,50 @@ data class Song(
 
 data class PledgeVerse(val number: String, val text: String)
 
-data class Book(val id: String, val title: String, val author: String, val asset: String, val note: String)
+/** A book on the shelf: bundled (asset != null) or remote (remoteUrl != null). */
+data class Book(
+    val id: String,
+    val title: String,
+    val author: String,
+    val note: String,
+    val asset: String? = null,
+    val remoteUrl: String? = null,
+) {
+    val remote: Boolean get() = remoteUrl != null
+}
 
 data class NewsItem(val title: String, val id: String, val date: String, val views: Long)
 
 object Data {
-    private const val MANIFEST_URL =
-        "https://raw.githubusercontent.com/Pumyk/FFWPU-Holy-Songs-/main/content/manifest.json"
-    private const val NEWS_URL =
-        "https://raw.githubusercontent.com/Pumyk/FFWPU-Holy-Songs-/main/public/news.json"
+    private const val BASE_RAW =
+        "https://raw.githubusercontent.com/Pumyk/FFWPU-Holy-Songs-/main/"
+    private const val MANIFEST_URL = BASE_RAW + "content/manifest.json"
+    private const val NEWS_URL = BASE_RAW + "public/news.json"
 
     fun readAsset(ctx: Context, path: String): String =
         ctx.assets.open(path).bufferedReader().use { it.readText() }
+
+    fun httpGet(url: String): String? = try {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 12000
+        conn.setRequestProperty("User-Agent", "HPHCLibrary")
+        try {
+            if (conn.responseCode == 200) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else null
+        } finally {
+            conn.disconnect()
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun JSONObject.textOrNull(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        val v = optString(key)
+        return if (v.isBlank() || v == "null") null else v
+    }
 
     fun bundledSongs(ctx: Context): List<Song> = parseSongs(JSONArray(readAsset(ctx, "songs.json")))
 
@@ -43,13 +76,30 @@ object Data {
                 Song(
                     id = o.optString("id", title.lowercase().replace(' ', '-')),
                     title = title,
-                    number = o.optString("number").ifBlank { null },
+                    number = o.textOrNull("number"),
                     lyrics = lyrics,
-                    artist = o.optString("artist").ifBlank { null },
-                    album = o.optString("album").ifBlank { null },
-                    category = o.optString("category").ifBlank { null },
+                    artist = o.textOrNull("artist"),
+                    album = o.textOrNull("album"),
+                    category = o.textOrNull("category"),
                 )
             )
+        }
+    }
+
+    fun mergedSongs(bundled: List<Song>, remote: List<Song>): List<Song> {
+        if (remote.isEmpty()) return bundled
+        val remoteIds = remote.map { it.id }.toSet()
+        val local = bundled.filter { it.id !in remoteIds }
+        return local + remote
+    }
+
+    fun remoteSongs(): List<Song> {
+        val json = httpGet(MANIFEST_URL) ?: return emptyList()
+        return try {
+            val arr = JSONObject(json).optJSONArray("songs") ?: return emptyList()
+            parseSongs(arr)
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -63,63 +113,120 @@ object Data {
         }
     }
 
-    val books = listOf(
-        Book("mother-of-peace", "Mother of Peace", "Dr. Hak Ja Han Moon", "books/mother-of-peace.pdf", "Memoir"),
-        Book("way-of-tradition", "The Way of Tradition, Vol. I", "Rev. Sun Myung Moon", "books/way-of-tradition-vol1.pdf", "Selected passages"),
+    /** Books bundled with the app (offline from first launch). */
+    val bundledBooks = listOf(
+        Book(
+            id = "mother-of-peace",
+            title = "Mother of Peace",
+            author = "Dr. Hak Ja Han Moon",
+            note = "Memoir · 369 pages",
+            asset = "books/mother-of-peace.pdf",
+        ),
+        Book(
+            id = "way-of-tradition",
+            title = "The Way of Tradition, Vol. I",
+            author = "Rev. Sun Myung Moon",
+            note = "Selected passages · 315 pages",
+            asset = "books/way-of-tradition-vol1.pdf",
+        ),
     )
 
-    fun bundledNews(ctx: Context): Pair<List<NewsItem>, String> = parseNews(readAsset(ctx, "news.json"))
-
-    private fun parseNews(raw: String): Pair<List<NewsItem>, String> {
-        val o = JSONObject(raw)
-        val channel = o.optJSONObject("channel")?.optString("title") ?: "HJ PeaceTV"
-        val arr = o.optJSONArray("items") ?: JSONArray()
-        return buildList {
-            for (i in 0 until arr.length()) {
-                val it = arr.optJSONObject(i) ?: continue
-                add(
-                    NewsItem(
-                        title = it.optString("title"),
-                        id = it.optString("id"),
-                        date = it.optString("date"),
-                        views = it.optLong("views"),
+    /** Extra PDF books published in content/manifest.json (downloaded on first open). */
+    fun remoteBooks(): List<Book> {
+        val json = httpGet(MANIFEST_URL) ?: return emptyList()
+        return try {
+            val arr = JSONObject(json).optJSONArray("books") ?: return emptyList()
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val title = o.optString("title")
+                    val url = o.optString("url")
+                    if (title.isBlank() || url.isBlank()) continue
+                    add(
+                        Book(
+                            id = o.optString("id", "book-$i"),
+                            title = title,
+                            author = o.optString("author", ""),
+                            note = o.optString("note", "From the cloud"),
+                            remoteUrl = if (url.startsWith("http")) url else BASE_RAW + url.removePrefix("/"),
+                        )
                     )
-                )
+                }
             }
-        } to channel
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
-    private fun httpGet(url: String): String? = try {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 8000
-        conn.readTimeout = 8000
-        conn.setRequestProperty("User-Agent", "HPHC-Library")
-        conn.inputStream.bufferedReader().use { it.readText() }.also { conn.disconnect() }
-    } catch (_: Exception) {
-        null
+    /** Local PDF file for a book: copies bundled assets, downloads remote ones once. */
+    fun pdfFile(ctx: Context, book: Book): File? {
+        val dir = File(ctx.filesDir, "books").apply { mkdirs() }
+        return if (book.remoteUrl != null) {
+            val out = File(dir, book.id + ".pdf")
+            if (out.exists() && out.length() > 0) out
+            else try {
+                val conn = URL(book.remoteUrl).openConnection() as HttpURLConnection
+                conn.connectTimeout = 10000
+                conn.readTimeout = 60000
+                conn.setRequestProperty("User-Agent", "HPHCLibrary")
+                try {
+                    if (conn.responseCode != 200) return null
+                    conn.inputStream.use { input -> out.outputStream().use { input.copyTo(it) } }
+                    out
+                } finally {
+                    conn.disconnect()
+                }
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            val asset = book.asset ?: return null
+            val out = File(ctx.cacheDir, asset.replace('/', '_'))
+            if (!out.exists() || out.length() == 0L) {
+                ctx.assets.open(asset).use { input -> out.outputStream().use { input.copyTo(it) } }
+            }
+            out
+        }
     }
 
-    /** Songs added to content/manifest.json appear without an app update. */
-    fun remoteSongs(): List<Song> = try {
-        val body = httpGet("$MANIFEST_URL?t=${System.currentTimeMillis()}") ?: return emptyList()
-        parseSongs(JSONObject(body).optJSONArray("songs") ?: JSONArray())
-    } catch (_: Exception) {
-        emptyList()
-    }
-
-    fun mergedSongs(local: List<Song>, remote: List<Song>): List<Song> {
-        val byId = LinkedHashMap<String, Song>()
-        local.forEach { byId[it.id] = it }
-        remote.forEach { byId[it.id] = it }
-        return byId.values.toList()
-    }
-
-    fun remoteNews(): Pair<List<NewsItem>, String>? = try {
-        val body = httpGet("$NEWS_URL?t=${System.currentTimeMillis()}") ?: return null
-        parseNews(body).takeIf { it.first.isNotEmpty() }
-    } catch (_: Exception) {
+    /** Per-page text for in-book search (bundled books only). */
+    fun pageText(ctx: Context, bookId: String): List<String>? = try {
+        val arr = JSONArray(readAsset(ctx, "books/$bookId.text.json"))
+        List(arr.length()) { arr.optString(it, "") }
+    } catch (e: Exception) {
         null
     }
 
     fun youtubeUrl(videoId: String) = "https://www.youtube.com/watch?v=$videoId"
+
+    fun bundledNews(ctx: Context): Pair<List<NewsItem>, String> = parseNews(readAsset(ctx, "news.json"))
+
+    fun remoteNews(): Pair<List<NewsItem>, String>? {
+        val json = httpGet(NEWS_URL) ?: return null
+        return try {
+            parseNews(json).takeIf { it.first.isNotEmpty() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun parseNews(raw: String): Pair<List<NewsItem>, String> {
+        val root = JSONObject(raw)
+        val channel = root.optJSONObject("channel")?.optString("title").orEmpty().ifBlank { "HJ PeaceTV" }
+        val arr = root.optJSONArray("items") ?: JSONArray()
+        val items = buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                add(
+                    NewsItem(
+                        title = o.optString("title"),
+                        id = o.optString("id"),
+                        date = o.optString("date"),
+                        views = o.optLong("views", 0),
+                    )
+                )
+            }
+        }
+        return items to channel
+    }
 }
