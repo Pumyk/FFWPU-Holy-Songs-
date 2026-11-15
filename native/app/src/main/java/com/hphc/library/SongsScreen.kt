@@ -53,7 +53,7 @@ fun SongsScreen(songs: List<Song>, onOpen: (Song) -> Unit) {
     }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-            Text("Holy Songs", fontSize = 30.sp, fontWeight = FontWeight.Black)
+            Text("Holy Songs", fontFamily = Lora, fontSize = 31.sp, fontWeight = FontWeight.Bold)
             Text(
                 "${songs.size} songs ready",
                 color = MaterialTheme.colorScheme.primary,
@@ -171,7 +171,7 @@ fun SongDetailScreen(song: Song, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.size(10.dp))
                     }
-                    Text(song.title, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                    Text(song.title, fontFamily = Lora, fontSize = 29.sp, fontWeight = FontWeight.Bold, lineHeight = 34.sp)
                 }
                 Spacer(Modifier.height(18.dp))
             }
@@ -187,7 +187,7 @@ fun SongDetailScreen(song: Song, onBack: () -> Unit) {
                         Column(Modifier.padding(14.dp)) {
                             Text("CHORUS", fontSize = 10.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.4.sp)
                             Spacer(Modifier.height(4.dp))
-                            Text(block.text, fontFamily = FontFamily.Serif, fontSize = 17.sp, lineHeight = 26.sp)
+                            Text(block.text, fontFamily = Lora, fontSize = 18.sp, lineHeight = 30.sp)
                         }
                     }
                     Spacer(Modifier.height(10.dp))
@@ -200,7 +200,7 @@ fun SongDetailScreen(song: Song, onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(width = 22.dp, height = 24.dp),
                         )
-                        Text(block.text, fontFamily = FontFamily.Serif, fontSize = 17.sp, lineHeight = 26.sp)
+                        Text(block.text, fontFamily = Lora, fontSize = 18.sp, lineHeight = 30.sp)
                     }
                     Spacer(Modifier.height(6.dp))
                 }
@@ -229,7 +229,7 @@ fun lyricBlocks(lyrics: String): List<LyricBlock> {
 fun PledgeScreen(verses: List<PledgeVerse>) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp)) {
         item {
-            Text("Family Pledge", fontSize = 30.sp, fontWeight = FontWeight.Black)
+            Text("Family Pledge", fontFamily = Lora, fontSize = 31.sp, fontWeight = FontWeight.Bold)
             Text(
                 "Eight pledges · centering on true love",
                 color = MaterialTheme.colorScheme.primary,
@@ -249,7 +249,7 @@ fun PledgeScreen(verses: List<PledgeVerse>) {
                 Column(Modifier.padding(16.dp)) {
                     Text(v.number, fontSize = 12.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(6.dp))
-                    Text(v.text, fontFamily = FontFamily.Serif, fontSize = 16.sp, lineHeight = 25.sp)
+                    Text(v.text, fontFamily = Lora, fontSize = 17.sp, lineHeight = 28.sp)
                 }
             }
         }

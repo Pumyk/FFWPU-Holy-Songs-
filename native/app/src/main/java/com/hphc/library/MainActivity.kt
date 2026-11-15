@@ -2,6 +2,7 @@ package com.hphc.library
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -82,6 +83,15 @@ private fun App() {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var route by remember { mutableStateOf<Route>(Route.Home) }
+
+    // System back: song/book -> its section -> home. Only home exits the app.
+    BackHandler(enabled = route !is Route.Home) {
+        route = when (val r = route) {
+            is Route.SongRoute -> Route.SectionRoute(Section.Songs)
+            is Route.BookRoute -> Route.SectionRoute(Section.Books)
+            else -> Route.Home
+        }
+    }
 
     val bundled = remember { Data.bundledSongs(ctx) }
     var remote by remember { mutableStateOf<List<Song>>(emptyList()) }
