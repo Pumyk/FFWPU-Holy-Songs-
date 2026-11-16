@@ -193,7 +193,7 @@ private fun ChapterList(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(14.dp),
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                        1.dp, MaterialTheme.colorScheme.outlineVariant,
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -250,7 +250,7 @@ private fun ChapterList(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }

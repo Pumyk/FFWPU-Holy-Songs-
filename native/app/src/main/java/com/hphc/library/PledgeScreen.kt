@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,7 +78,14 @@ fun PledgeScreen(
 
     KeepScreenOn(keepAwake)
 
-    Column(modifier.fillMaxSize()) {
+    Box(
+        modifier
+            .fillMaxSize()
+            // One pinch target for the whole screen, so zoom works in Read and in
+            // Recite, and single-finger drags still scroll.
+            .pinchToZoom { factor -> onZoom(clampZoom(zoom * factor)) },
+    ) {
+    Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
             Text(
                 "Family Pledge",
@@ -146,8 +154,9 @@ fun PledgeScreen(
         } else if (recite) {
             RecitePager(verses, face, body, leading)
         } else {
-            PledgeList(verses, face, body, leading, autoSpeed, zoom, onZoom)
+            PledgeList(verses, face, body, leading, autoSpeed)
         }
+    }
     }
 }
 
@@ -158,8 +167,6 @@ private fun PledgeList(
     body: Float,
     leading: Float,
     autoSpeed: Int,
-    zoom: Float,
-    onZoom: (Float) -> Unit,
 ) {
     val state = rememberLazyListState()
     LaunchedEffect(autoSpeed) {
@@ -171,7 +178,7 @@ private fun PledgeList(
     }
     LazyColumn(
         state = state,
-        modifier = Modifier.pinchToZoom { factor -> onZoom(clampZoom(zoom * factor)) },
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
     ) {
         itemsIndexed(verses, key = { _, v -> v.number }) { idx, v ->
@@ -179,7 +186,7 @@ private fun PledgeList(
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(18.dp),
                 border = androidx.compose.foundation.BorderStroke(
-                    1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                    1.dp, MaterialTheme.colorScheme.outlineVariant,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,7 +245,7 @@ private fun RecitePager(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(20.dp),
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                        1.dp, MaterialTheme.colorScheme.outlineVariant,
                     ),
                     modifier = Modifier
                         .fillMaxSize()
@@ -247,6 +254,7 @@ private fun RecitePager(
                     Column(
                         Modifier
                             .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp, vertical = 24.dp),
                     ) {
                         Text(

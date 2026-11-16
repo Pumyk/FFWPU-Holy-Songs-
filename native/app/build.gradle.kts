@@ -12,8 +12,8 @@ android {
         applicationId = "com.hphc.library"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "3.5.2"
+        versionCode = 9
+        versionName = "3.5.3"
     }
 
     /**
