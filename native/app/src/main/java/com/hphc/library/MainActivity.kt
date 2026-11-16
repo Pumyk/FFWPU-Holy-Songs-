@@ -261,7 +261,7 @@ private fun App(
 
                         Spacer(Modifier.weight(1f))
                         HorizontalDivider(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.outlineVariant,
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
@@ -667,7 +667,7 @@ private fun HomeScreen(onPick: (Section) -> Unit) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onPick(s) },

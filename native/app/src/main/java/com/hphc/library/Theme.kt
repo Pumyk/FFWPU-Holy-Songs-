@@ -56,10 +56,12 @@ private val AmoledScheme = darkColorScheme(
     onSecondary = Color.Black,
     background = AmoledBlack,
     onBackground = Cream,
-    surface = AmoledBlack,
+    surface = Color(0xFF0B0908),
     onSurface = Cream,
-    surfaceVariant = Color(0xFF141110),
+    surfaceVariant = Color(0xFF191512),
     onSurfaceVariant = MutedWarm,
+    outline = Color(0xFF4A4038),
+    outlineVariant = Color(0xFF2B2420),
 )
 
 /** Warm charcoal - easier than pure black in daylight. */
@@ -74,6 +76,8 @@ private val DarkScheme = darkColorScheme(
     onSurface = Cream,
     surfaceVariant = Color(0xFF272019),
     onSurfaceVariant = Color(0xFFB3A491),
+    outline = Color(0xFF4C4237),
+    outlineVariant = Color(0xFF322A23),
 )
 
 /** Warm paper. */
@@ -88,6 +92,8 @@ private val LightScheme = lightColorScheme(
     onSurface = Color(0xFF1F1A14),
     surfaceVariant = Color(0xFFF0E7D6),
     onSurfaceVariant = Color(0xFF6B5F4F),
+    outline = Color(0xFFC9BAA2),
+    outlineVariant = Color(0xFFE3D7C3),
 )
 
 private val AppTypography = Typography(

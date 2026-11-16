@@ -208,7 +208,7 @@ fun SongsScreen(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(50),
                         border = androidx.compose.foundation.BorderStroke(
-                            1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                            1.dp, MaterialTheme.colorScheme.outlineVariant,
                         ),
                         modifier = Modifier.clickable { onOpen(song) },
                     ) {
@@ -377,7 +377,7 @@ private fun SongRow(
         }
     }
     HorizontalDivider(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.outlineVariant,
         modifier = Modifier.padding(start = 20.dp, end = 20.dp),
     )
 }
@@ -785,7 +785,7 @@ fun SongDetailScreen(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(16.dp),
                         border = androidx.compose.foundation.BorderStroke(
-                            1.dp, MaterialTheme.colorScheme.surfaceVariant,
+                            1.dp, MaterialTheme.colorScheme.outlineVariant,
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -959,7 +959,7 @@ private fun AddToSetDialog(
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
                 Spacer(Modifier.height(14.dp))
                 Surface(
