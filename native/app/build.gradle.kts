@@ -4,33 +4,33 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseSigning = listOf(
+    "HPHC_RELEASE_KEYSTORE", "HPHC_RELEASE_STORE_PASSWORD",
+    "HPHC_RELEASE_KEY_ALIAS", "HPHC_RELEASE_KEY_PASSWORD",
+).associateWith { providers.environmentVariable(it).orNull?.takeIf(String::isNotBlank) }
+val missingReleaseSigning = releaseSigning.filterValues { it == null }.keys
+
 android {
     namespace = "com.hphc.library"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.hphc.library"
+        applicationId = "com.hphc.library.android"
         minSdk = 24
         targetSdk = 36
         versionCode = 9
         versionName = "3.5.3"
     }
 
-    /**
-     * One permanent signing key, checked in with the project on purpose:
-     * every build (this machine, CI, any future machine) is signed with the
-     * same certificate, so a new APK installs straight over the old one and
-     * Android never reports a signature mismatch.
-     *
-     * Losing this file means losing the ability to update installed copies -
-     * keep it with the repo, not just on one computer.
-     */
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("hphc-release.keystore")
-            storePassword = "REMOVED_COMPROMISED_CREDENTIAL"
-            keyAlias = "hphc"
-            keyPassword = "REMOVED_COMPROMISED_CREDENTIAL"
+            // Keep AGP signing validation enabled even if credentials are missing.
+            // The placeholder values are not secrets and cannot sign anything.
+            storeFile = releaseSigning["HPHC_RELEASE_KEYSTORE"]?.let { rootProject.file(it) }
+                ?: rootProject.file(".release-keystore-not-configured")
+            storePassword = releaseSigning["HPHC_RELEASE_STORE_PASSWORD"] ?: "not-configured"
+            keyAlias = releaseSigning["HPHC_RELEASE_KEY_ALIAS"] ?: "not-configured"
+            keyPassword = releaseSigning["HPHC_RELEASE_KEY_PASSWORD"] ?: "not-configured"
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
@@ -46,9 +46,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
-            // Same key as release: an APK from CI or a local build installs
-            // over whatever is already on the phone.
-            signingConfig = signingConfigs.getByName("release")
+            applicationIdSuffix = ".debug"
         }
     }
     compileOptions {
@@ -58,6 +56,16 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
     androidResources { noCompress += "pdf" }
+}
+
+tasks.configureEach {
+    if (name == "validateSigningRelease") {
+        doFirst {
+            check(missingReleaseSigning.isEmpty()) {
+                "Release signing is not configured. Set: ${missingReleaseSigning.joinToString()}"
+            }
+        }
+    }
 }
 
 dependencies {

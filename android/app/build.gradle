@@ -17,11 +17,12 @@ android {
         }
     }
     buildTypes {
+        debug {
+            applicationIdSuffix ".legacydebug"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // Debug-signed release so the APK is directly installable for sideloading
-            signingConfig signingConfigs.debug
         }
     }
 }

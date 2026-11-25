@@ -18,10 +18,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build release APK
+      - name: Build debug APK
         working-directory: native
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: native-release
-          path: native/app/build/outputs/apk/release/app-release.apk
+          name: native-debug
+          path: native/app/build/outputs/apk/debug/app-debug.apk
