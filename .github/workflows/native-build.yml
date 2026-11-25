@@ -1,20 +1,16 @@
 name: Build native app (Compose)
+
 on:
   workflow_dispatch:
   push:
-    branches: [preview/pdf-news]
-    paths: ['native/**', '.github/workflows/native-build.yml']
-permissions:
-  contents: read
+    paths:
+      - 'native/**'
+
 jobs:
   build:
-    if: github.ref == 'refs/heads/preview/pdf-news'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,42 +18,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-          cache-disabled: true
-      - name: Build test APK
+      - name: Build debug APK
         working-directory: native
         run: gradle assembleDebug --no-daemon
-      - name: Encrypt the APK for private delivery
-        shell: bash
-        run: |
-          cat > /tmp/hphc-preview-transport.crt <<'CERT'
-          -----BEGIN CERTIFICATE-----
-          MIIDLTCCAhWgAwIBAgIUAkKFWjcvG7CPmKYR42CCDRUjEf8wDQYJKoZIhvcNAQEL
-          BQAwJjEkMCIGA1UEAwwbSFBIQyBwcmV2aWV3IHRyYW5zcG9ydCBvbmx5MB4XDTI2
-          MTEyNTIwNTAxMFoXDTI2MTEyNzIwNTAxMFowJjEkMCIGA1UEAwwbSFBIQyBwcmV2
-          aWV3IHRyYW5zcG9ydCBvbmx5MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
-          AQEAteqjkBIuxS5fxRocHJsyJrEHYzILJWAw6sdwpyHqbugDYEho6gVda7qm3zjh
-          gFf1o2U0oONdwQ3l8hKZhn87ohdfIkERzM+zHIxKHLpeaZRmRtG1KPFkTfOah/2W
-          OpcR3/Ywvd+jz1kHIdjW/tIUgSD4CbryNkuEjpZHiawhuK+TmAl+D9AVOG325BNn
-          4/jAYt6z5P6Ieazdd2ZBW6Ix39F/44Z4WH8NUo6AmcMKsMEDbrCeTR4d0EsTVteD
-          2gccP55RHVXnkh7/0huYt7UEagw2dofeVuvkfSOcPdMFMishDbFa4XOjGs6qDxJN
-          bERC2aILvCm518PJWCajvCVd5wIDAQABo1MwUTAdBgNVHQ4EFgQUgzoE0+/E5eMv
-          l4vqthW9t4tMlbowHwYDVR0jBBgwFoAUgzoE0+/E5eMvl4vqthW9t4tMlbowDwYD
-          VR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAAIs9lCLpqIzYjBGahCFl
-          fF02fHBblB72i0k2Cj/ZfFoz8ocSCk8A4f/Upe36a8iJr/UwtgS3SpfM78evRvE7
-          BZyOSlemNAnoWnSxA9pGbiFQbLckI6/9LccVgjp4n0Hh2M/F5joRJ6mPVewFZPMQ
-          4TS2k6rg3SkIbS8ObZy+2+gEQXT6/e8h08Co2xgpR+uIeYotnV2+jq8qsJALuItW
-          qhLStBJlr02v5MKMoUdWVm9mdAVvX++qIJzHsXEK5XBP1UsTKerKIA2OZGV9rIWP
-          SoP1R1aHvbHzlcKWgMBMqVaN9d2LS0qgNshcVruVf3Zf4yrwF7ZnoqG0ZU/y9+YD
-          Qw==
-          -----END CERTIFICATE-----
-          CERT
-          openssl cms -encrypt -binary -aes-256-cbc -outform DER \
-            -in native/app/build/outputs/apk/debug/app-debug.apk \
-            -out HPHC-preview.apk.cms /tmp/hphc-preview-transport.crt
       - uses: actions/upload-artifact@v4
         with:
-          name: private-hphc-preview
-          path: HPHC-preview.apk.cms
-          retention-days: 1
-          if-no-files-found: error
-          compression-level: 0
+          name: native-debug
+          path: native/app/build/outputs/apk/debug/app-debug.apk
