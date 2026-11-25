@@ -220,6 +220,10 @@ object Data {
         null
     }
 
+    private val youtubeId = Regex("[A-Za-z0-9_-]{11}")
+
+    fun isYoutubeId(videoId: String) = youtubeId.matches(videoId)
+
     fun youtubeUrl(videoId: String) = "https://www.youtube.com/watch?v=$videoId"
 
     /** True when the device currently has a usable internet connection. */
@@ -235,7 +239,7 @@ object Data {
      * reused so an offline tap still shows a recognisable cover.
      */
     fun thumbFile(ctx: Context, videoId: String): File? {
-        if (videoId.isBlank()) return null
+        if (!isYoutubeId(videoId)) return null
         val dir = File(ctx.filesDir, "thumbs").apply { mkdirs() }
         val out = File(dir, "$videoId.jpg")
         if (out.exists() && out.length() > 0) return out
@@ -274,12 +278,15 @@ object Data {
         val channel = root.optJSONObject("channel")?.optString("title").orEmpty().ifBlank { "HJ PeaceTV" }
         val arr = root.optJSONArray("items") ?: JSONArray()
         val items = buildList {
+            val seen = mutableSetOf<String>()
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
+                val id = o.optString("id")
+                if (!isYoutubeId(id) || !seen.add(id)) continue
                 add(
                     NewsItem(
                         title = o.optString("title"),
-                        id = o.optString("id"),
+                        id = id,
                         date = o.optString("date"),
                         views = o.optLong("views", 0),
                     )

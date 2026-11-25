@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,11 +29,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -69,9 +73,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -245,6 +252,7 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
     var pageCount by remember { mutableIntStateOf(0) }
     val pageRatio = remember { mutableStateMapOf<Int, Float>() }
     val bitmaps = remember { mutableStateMapOf<Int, Bitmap>() }
+    val renderLock = remember { Any() }
     val state = rememberLazyListState(
         initialFirstVisibleItemIndex = prefs.pdfPage(book.id),
     )
@@ -279,11 +287,13 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
             r.openPage(i).use { p -> pageRatio[i] = p.width.toFloat() / p.height.toFloat() }
         }
         onDispose {
-            bitmaps.values.forEach { if (!it.isRecycled) it.recycle() }
-            runCatching { renderer?.close() }
-            runCatching { pfd?.close() }
-            renderer = null
-            pfd = null
+            synchronized(renderLock) {
+                bitmaps.values.forEach { if (!it.isRecycled) it.recycle() }
+                runCatching { renderer?.close() }
+                runCatching { pfd?.close() }
+                renderer = null
+                pfd = null
+            }
         }
     }
 
@@ -364,32 +374,28 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
                     .weight(1f)
                     .padding(start = 6.dp),
             ) {
-                Text(book.title, fontFamily = Lora, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(
-                    when {
-                        loading -> "preparing…"
-                        failed -> "couldn't load this book"
-                        else -> "page ${state.firstVisibleItemIndex + 1} / $pageCount"
-                    },
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    book.title,
+                    fontFamily = Lora,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (loading || failed) {
+                    Text(
+                        if (loading) "Preparing…" else "Couldn't load this book",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             AidChip(filterLabel(filter), filter != 0) {
                 filter = (filter + 1) % 3
                 prefs.pdfFilter = filter
             }
             Spacer(Modifier.width(6.dp))
-            IconButton(onClick = { jumpOpen = true }, modifier = Modifier.size(34.dp)) {
-                Text(
-                    "#",
-                    fontFamily = Ui,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            IconButton(onClick = { marksOpen = true }, modifier = Modifier.size(34.dp)) {
+            IconButton(enabled = pageCount > 0, onClick = { marksOpen = true }) {
                 Icon(
                     if (marks.any { it.page == state.firstVisibleItemIndex + 1 }) {
                         Icons.Default.Bookmark
@@ -402,15 +408,25 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
                 )
             }
             if (pageTexts != null) {
-                IconButton(onClick = { searchOpen = !searchOpen }, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = { searchOpen = !searchOpen }) {
                     Icon(
                         if (searchOpen) Icons.Default.Close else Icons.Default.Search,
-                        "Search in book",
+                        if (searchOpen) "Close book search" else "Search in book",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(17.dp),
                     )
                 }
             }
+        }
+        if (!loading && !failed && pageCount > 0) {
+            val current = state.firstVisibleItemIndex.coerceIn(0, pageCount - 1)
+            PdfPageToolbar(
+                currentPage = current + 1,
+                pageCount = pageCount,
+                onPrevious = { scope.launch { state.scrollToItem(current - 1) } },
+                onNext = { scope.launch { state.scrollToItem(current + 1) } },
+                onJump = { jumpOpen = true },
+            )
         }
         if (searchOpen) {
             Surface(
@@ -491,34 +507,83 @@ fun PdfBookScreen(book: Book, prefs: LibraryPrefs) {
                 )
             }
         } else {
-            LazyColumn(
-                state = state,
-                contentPadding = PaddingValues(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items((0 until pageCount).toList(), key = { it }) { index ->
-                    PageCanvas(
-                        index = index,
-                        ratio = pageRatio[index] ?: 0.77f,
-                        bitmap = bitmaps[index],
-                        colorFilter = pdfFilter(filter),
-                        onTap = { zoomPage = index },
-                        render = {
-                            val r = renderer
-                            if (r != null && index < r.pageCount) {
-                                r.openPage(index).use { p ->
-                                    val w = 1000
-                                    val h = (w * p.height.toFloat() / p.width).toInt()
-                                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                                    bmp.eraseColor(android.graphics.Color.WHITE)
-                                    p.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                    bitmaps[index] = bmp
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                // Leave enough space below short pages to align the last page at the top.
+                // Otherwise a jump/Next tap can land on the prior page in landscape.
+                val lastRatio = pageRatio[pageCount - 1] ?: 0.77f
+                val lastHeight = (maxWidth - 20.dp).coerceAtLeast(1.dp) / lastRatio
+                val bottomPadding = (maxHeight - lastHeight).coerceAtLeast(10.dp)
+                LazyColumn(
+                    state = state,
+                    contentPadding = PaddingValues(
+                        start = 10.dp, top = 10.dp, end = 10.dp, bottom = bottomPadding,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(count = pageCount, key = { it }) { index ->
+                        PageCanvas(
+                            index = index,
+                            ratio = pageRatio[index] ?: 0.77f,
+                            bitmap = bitmaps[index],
+                            colorFilter = pdfFilter(filter),
+                            onTap = { zoomPage = index },
+                            render = {
+                                // LazyColumn may request several pages together.
+                                // PdfRenderer allows only one opened page at a time.
+                                synchronized(renderLock) {
+                                    val r = renderer
+                                    if (r != null && index < r.pageCount) {
+                                        r.openPage(index).use { p ->
+                                            val w = 1000
+                                            val h = (w * p.height.toFloat() / p.width).toInt()
+                                            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                            bmp.eraseColor(android.graphics.Color.WHITE)
+                                            p.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                            bitmaps[index] = bmp
+                                        }
+                                    }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PdfPageToolbar(
+    currentPage: Int,
+    pageCount: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onJump: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        IconButton(onClick = onPrevious, enabled = currentPage > 1) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous PDF page")
+        }
+        TextButton(
+            onClick = onJump,
+            modifier = Modifier.weight(1f).semantics {
+                contentDescription = "Jump to page. Page $currentPage of $pageCount"
+            },
+        ) {
+            Text(
+                "Page $currentPage / $pageCount",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onNext, enabled = currentPage < pageCount) {
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next PDF page")
         }
     }
 }
@@ -576,7 +641,7 @@ private fun ZoomPageDialog(
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            Box(
+            BoxWithConstraints(
                 Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
@@ -587,13 +652,15 @@ private fun ZoomPageDialog(
                     },
                 contentAlignment = Alignment.Center,
             ) {
+                val ratio = bitmap.width.toFloat() / bitmap.height
+                val fittedWidth = minOf(maxWidth, maxHeight * ratio)
                 Image(
                     bitmap.asImageBitmap(),
                     contentDescription = "Page $page of $total",
                     colorFilter = colorFilter,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(bitmap.width.toFloat() / bitmap.height)
+                        .width(fittedWidth)
+                        .aspectRatio(ratio)
                         .graphicsLayer(
                             scaleX = scale,
                             scaleY = scale,
@@ -614,13 +681,29 @@ private fun ZoomPageDialog(
                 color = Color(0xCC141110),
                 shape = CircleShape,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(18.dp)
-                    .size(38.dp)
-                    .clickable { onClose() },
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, "Close page", tint = Color(0xFFF2E7D3), modifier = Modifier.size(18.dp))
+                IconButton(onClick = {
+                    scale = 1f
+                    offset = Offset.Zero
+                }) {
+                    Icon(
+                        Icons.Default.FitScreen,
+                        "Fit page and reset zoom",
+                        tint = Color(0xFFF2E7D3),
+                    )
+                }
+            }
+            Surface(
+                color = Color(0xCC141110),
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, "Close page", tint = Color(0xFFF2E7D3))
                 }
             }
         }

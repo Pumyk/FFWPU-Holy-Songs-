@@ -37,8 +37,8 @@ import java.util.Locale
 
 private fun prettyDate(iso: String): String = try {
     val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-    val date = parser.parse(iso) ?: return iso.take(10)
-    SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(date)
+    parser.parse(iso)?.let { SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(it) }
+        ?: iso.take(10)
 } catch (_: Exception) {
     iso.take(10)
 }
@@ -52,9 +52,8 @@ private fun prettyViews(views: Long): String = when {
 }
 
 /**
- * HJ Global News: each edition opens in the in-app player (YouTubeScreen)
- * instead of bouncing the viewer out to the YouTube app. Pull down to
- * refresh; editions you have already watched are marked.
+ * Each edition opens its player screen with a direct YouTube fallback.
+ * Pull down to refresh; started in-app playback is marked as watched.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,7 +183,7 @@ fun NewsScreen(
                             ) {
                                 Icon(
                                     Icons.Default.PlayArrow,
-                                    "Play in app",
+                                    null,
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(15.dp),
                                 )

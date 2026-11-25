@@ -511,11 +511,7 @@ private fun App(
                                                 newsRefreshing = false
                                             }
                                         },
-                                        onPlay = {
-                                            prefs.markWatched(it.id)
-                                            watched = prefs.watchedNews
-                                            route = Route.VideoRoute(it)
-                                        },
+                                        onPlay = { route = Route.VideoRoute(it) },
                                     )
                                 }
                                 is Route.SongRoute -> SongPage(
@@ -562,7 +558,12 @@ private fun App(
                                 } else {
                                     PdfBookScreen(r.book, prefs)
                                 }
-                                is Route.VideoRoute -> YouTubeScreen(r.item)
+                                is Route.VideoRoute -> YouTubeScreen(r.item) {
+                                    if (r.item.id !in watched) {
+                                        prefs.markWatched(r.item.id)
+                                        watched = prefs.watchedNews
+                                    }
+                                }
                             }
                         }
                     }
